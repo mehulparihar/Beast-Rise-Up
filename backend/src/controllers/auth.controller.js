@@ -57,6 +57,8 @@ export const signup = async (req, res, next) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            accessToken,
+            refreshToken,
         });
     } catch (error) {
         console.log("Error in signup controller", error.message);
@@ -73,12 +75,13 @@ export const login = async (req, res) => {
             const { accessToken, refreshToken } = generateTokens(user._id);
             await storeRefreshToken(user._id, refreshToken);
             setCookies(res, accessToken, refreshToken);
-
             res.json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
+                accessToken,
+                refreshToken,
             });
         } else {
             res.status(400).json({ message: "Invalid email or password" });
@@ -218,4 +221,29 @@ export const resetPassword = async (req, res) => {
     console.error("Reset Password Error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
+};
+
+export const updateProfile = async (req, res) => {
+    try {
+        const user = req.user;
+        const { name, email, password, addresses } = req.body;
+
+        if (name) user.name = name;
+        if (email) user.email = email;
+        if (password) user.password = password;
+        if(addresses) user.addresses = addresses;
+
+        await user.save();
+
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            addresses: user.addresses,
+        });
+    } catch (error) {
+        console.log("Error in updateProfile controller", error.message);
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
 };

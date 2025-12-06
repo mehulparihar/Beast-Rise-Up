@@ -6,6 +6,7 @@ import api from "./axios";
  * body: { name, email, password }
  * response: { accessToken, refreshToken, user }
  */
+
 export const signup = async (payload) => {
   const res = await api.post("/auth/signup", payload);
   return res.data;
@@ -17,8 +18,14 @@ export const signup = async (payload) => {
  * response: { accessToken, refreshToken, user }
  */
 export const login = async (payload) => {
-  const res = await api.post("/auth/login", payload);
-  return res.data;
+  try {
+    const res = await api.post("/auth/login", payload);
+    return res.data;
+    
+  } catch (error) {
+    console.error("Login error:", error);
+  }
+  
 };
 
 /**

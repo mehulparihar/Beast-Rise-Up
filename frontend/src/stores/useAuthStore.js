@@ -1,130 +1,158 @@
 /**
- * Cart store (Zustand)
- * - Persist cart locally for quick UI
- * - Sync with backend
- * - Optimistic updates for add/update/remove
+ * Auth store (Zustand)
+ * - persists token to localStorage
+ * - exposes login/register/logout/refresh/fetchProfile actions
  */
 
-import create from "zustand";
-import { getCart, addToCart as apiAddToCart, updateCartItem as apiUpdateCartItem, removeFromCart as apiRemoveFromCart, clearCart as apiClearCart } from "../api/cart.api";
+import { create } from "zustand";
+import { login as apiLogin, signup as apiSignup, logout as apiLogout, getProfile, refreshToken as apiRefreshToken, forgotPassword as apiForgotPassword, resetPassword as apiResetPassword } from "../api/auth.api";
 
-const CART_KEY = "cart_v1";
+// Key names for localStorage
+const TOKEN_KEY = "token";
+const REFRESH_KEY = "refreshToken";
+const USER_KEY = "user";
 
-const useCartStore = create((set, get) => ({
-  cart: JSON.parse(localStorage.getItem(CART_KEY) || "[]"),
+const useAuthStore = create((set, get) => ({
+  // state
+  user: JSON.parse(localStorage.getItem(USER_KEY)) || null,
+  token: localStorage.getItem(TOKEN_KEY) || null,
+  refreshToken: localStorage.getItem(REFRESH_KEY) || null,
   loading: false,
   error: null,
 
-  setCart: (cart) => {
-    localStorage.setItem(CART_KEY, JSON.stringify(cart || []));
-    set({ cart });
-  },
-
+  // setters
   setLoading: (v) => set({ loading: v }),
   setError: (err) => set({ error: err }),
+  setUser: (user) => {
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    set({ user });
+  },
 
-  // load cart from backend (authorised)
-  loadCart: async () => {
+  // actions
+  // login: calls backend, persists tokens & user
+  login: async (credentials) => {
     set({ loading: true, error: null });
     try {
-      const res = await getCart();
-      const cart = res.cart || res.data?.cart || [];
-      localStorage.setItem(CART_KEY, JSON.stringify(cart));
-      set({ cart, loading: false });
-      return { success: true, cart };
+      const res = await apiLogin(credentials); // { accessToken, refreshToken, user }
+
+      const accessToken = res.accessToken || res.token || res.data?.accessToken;
+      const refresh = res.refreshToken || res.data?.refreshToken || null;
+      const user = res.user || res.data?.user || null;
+
+      if (!accessToken) throw new Error("No access token returned");
+
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+      set({ token: accessToken, refreshToken: refresh, user, loading: false, error: null });
+      return { success: true, user };
     } catch (err) {
-      console.error("Load cart error:", err);
+      console.error("Auth login error:", err);
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+
+  signup: async (payload) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await apiSignup(payload); // same shape
+      const accessToken = res.accessToken || res.token || res.data?.accessToken;
+      const refresh = res.refreshToken || res.data?.refreshToken || null;
+      const user = res.user || res.data?.user || null;
+
+      if (!accessToken) throw new Error("No access token returned");
+
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+      set({ token: accessToken, refreshToken: refresh, user, loading: false, error: null });
+      return { success: true, user };
+    } catch (err) {
+      console.error("Auth signup error:", err);
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+
+  // logout both client & backend
+  logout: async () => {
+    set({ loading: true });
+    try {
+      try { await apiLogout(); } catch (e) { /* ignore network error but continue clearing */ }
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(USER_KEY);
+      set({ user: null, token: null, refreshToken: null, loading: false, error: null });
+      return { success: true };
+    } catch (err) {
+      console.error("Logout error:", err);
       set({ loading: false, error: err?.message });
       return { success: false, message: err?.message };
     }
   },
 
-  // optimistic addToCart
-  addToCart: async (product, quantity = 1) => {
-    // product can be id or object. normalize:
-    const productId = typeof product === "string" ? product : product._id;
-    const prev = get().cart;
+  // refresh token (manual call if needed)
+  refresh: async () => {
+    const refresh = localStorage.getItem(REFRESH_KEY);
+    if (!refresh) return { success: false, message: "No refresh token" };
+    set({ loading: true, error: null });
     try {
-      // optimistic update locally
-      let next = [...prev];
-      const idx = next.findIndex((i) => i.product._id === productId || i.product === productId);
-      if (idx > -1) {
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + quantity };
-      } else {
-        // minimal product payload if product object not provided
-        const payloadProduct = typeof product === "string" ? { _id: productId } : product;
-        next.push({ product: payloadProduct, quantity });
-      }
-      set({ cart: next });
-      localStorage.setItem(CART_KEY, JSON.stringify(next));
+      const res = await apiRefreshToken({ refreshToken: refresh });
+      const accessToken = res.accessToken || res.token || res.data?.accessToken;
+      const user = res.user || res.data?.user || null;
+      if (!accessToken) throw new Error("Refresh did not return access token");
 
-      // backend call
-      await apiAddToCart({ productId, quantity }); // server will return synced cart sometimes
-      // re-sync from backend to ensure accurate data
-      await get().loadCart();
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+      set({ token: accessToken, user, loading: false });
       return { success: true };
     } catch (err) {
-      console.error("Add to cart failed:", err);
-      // rollback optimistic update
-      set({ cart: prev });
-      localStorage.setItem(CART_KEY, JSON.stringify(prev));
+      console.error("Refresh token error:", err);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(REFRESH_KEY);
+      localStorage.removeItem(USER_KEY);
+      set({ token: null, refreshToken: null, user: null, loading: false, error: err?.message });
+      return { success: false, message: err?.message };
+    }
+  },
+
+  fetchProfile: async () => {
+    set({ loading: true, error: null });
+    try {
+      const res = await getProfile();
+      const user = res.user || res.data?.user || null;
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+      set({ user, loading: false });
+      return { success: true, user };
+    } catch (err) {
+      console.error("Fetch profile error:", err);
+      set({ loading: false, error: err?.message });
+      return { success: false, message: err?.message };
+    }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      await apiForgotPassword({ email });
+      return { success: true };
+    } catch (err) {
+      console.error("Forgot password error:", err);
       return { success: false, message: err?.response?.data?.message || err.message };
     }
   },
 
-  // update quantity
-  updateQuantity: async (productId, quantity) => {
-    const prev = get().cart;
+  resetPassword: async (token, password) => {
     try {
-      const next = prev.map((it) =>
-        (it.product._id === productId || it.product === productId) ? { ...it, quantity } : it
-      );
-      set({ cart: next });
-      localStorage.setItem(CART_KEY, JSON.stringify(next));
-
-      await apiUpdateCartItem(productId, { quantity });
-      await get().loadCart();
+      await apiResetPassword(token, { password });
       return { success: true };
     } catch (err) {
-      console.error("Update cart error:", err);
-      set({ cart: prev });
-      localStorage.setItem(CART_KEY, JSON.stringify(prev));
-      return { success: false, message: err?.response?.data?.message || err.message };
-    }
-  },
-
-  removeFromCart: async (productId) => {
-    const prev = get().cart;
-    try {
-      const next = prev.filter((it) => !(it.product._id === productId || it.product === productId));
-      set({ cart: next });
-      localStorage.setItem(CART_KEY, JSON.stringify(next));
-
-      await apiRemoveFromCart(productId);
-      await get().loadCart();
-      return { success: true };
-    } catch (err) {
-      console.error("Remove from cart error:", err);
-      set({ cart: prev });
-      localStorage.setItem(CART_KEY, JSON.stringify(prev));
-      return { success: false, message: err?.response?.data?.message || err.message };
-    }
-  },
-
-  clearCart: async () => {
-    const prev = get().cart;
-    try {
-      set({ cart: [] });
-      localStorage.setItem(CART_KEY, JSON.stringify([]));
-      await apiClearCart();
-      return { success: true };
-    } catch (err) {
-      console.error("Clear cart error:", err);
-      set({ cart: prev });
-      localStorage.setItem(CART_KEY, JSON.stringify(prev));
+      console.error("Reset password error:", err);
       return { success: false, message: err?.response?.data?.message || err.message };
     }
   },
 }));
 
-export default useCartStore;
+export default useAuthStore;
