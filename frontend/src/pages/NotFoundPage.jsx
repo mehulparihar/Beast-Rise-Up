@@ -45,14 +45,14 @@ const NotFoundPage = () => {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link
-              href="/"
+              to="/"
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-foreground text-background font-bold rounded-xl hover:bg-foreground/90 transition-colors"
             >
               <Home size={18} />
               Back to Home
             </Link>
             <Link
-              href="/#shop"
+              to="/category/all"
               className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 bg-secondary text-foreground font-semibold rounded-xl hover:bg-secondary/80 transition-colors"
             >
               <Search size={18} />
@@ -72,7 +72,7 @@ const NotFoundPage = () => {
               {["New Arrivals", "Men", "Women", "Streetwear", "Gymwear", "Sale"].map((link) => (
                 <Link
                   key={link}
-                  href={`/#${link.toLowerCase().replace(" ", "-")}`}
+                  to={`/category/${link.toLowerCase().replace(" ", "-")}`}
                   className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
                 >
                   {link}

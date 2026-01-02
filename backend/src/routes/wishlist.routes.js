@@ -5,7 +5,7 @@ import { addToWishlist, removeFromWishlist, getWishlist } from '../controllers/w
 const router = express.Router();
 
 router.post("/add", protectRoute, addToWishlist);
-router.delete("/remove/:productId", protectRoute, removeFromWishlist);
+router.delete("/:productId", protectRoute, removeFromWishlist);
 router.get("/", protectRoute, getWishlist);
 
 export default router;

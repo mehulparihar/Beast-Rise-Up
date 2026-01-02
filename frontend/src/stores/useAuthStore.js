@@ -5,7 +5,7 @@
  */
 
 import { create } from "zustand";
-import { login as apiLogin, signup as apiSignup, logout as apiLogout, getProfile, refreshToken as apiRefreshToken, forgotPassword as apiForgotPassword, resetPassword as apiResetPassword } from "../api/auth.api";
+import {changePassword as changePasswordApi, updateProfile, sendOtp as apiSendOtp, verifyOtp as apiVerifyOtp, login as apiLogin, signup as apiSignup, logout as apiLogout, getProfile, refreshToken as apiRefreshToken, forgotPassword as apiForgotPassword, resetPassword as apiResetPassword, googleAuth as apiGoogleAuth } from "../api/auth.api";
 
 // Key names for localStorage
 const TOKEN_KEY = "token";
@@ -34,7 +34,7 @@ const useAuthStore = create((set, get) => ({
     set({ loading: true, error: null });
     try {
       const res = await apiLogin(credentials); // { accessToken, refreshToken, user }
-
+      if (!res) throw new Error("Email or password incorrect");
       const accessToken = res.accessToken || res.token || res.data?.accessToken;
       const refresh = res.refreshToken || res.data?.refreshToken || null;
       const user = res.user || res.data?.user || null;
@@ -45,10 +45,36 @@ const useAuthStore = create((set, get) => ({
       if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
       if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      set({ token: accessToken, refreshToken: refresh, user, loading: false, error: null });
+      await get().fetchProfile();
+
+      set({ token: accessToken, refreshToken: refresh, loading: false, error: null });
       return { success: true, user };
     } catch (err) {
       console.error("Auth login error:", err);
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+  googleLogin: async (credential) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await apiGoogleAuth({ credential }); // send token to backend
+      const accessToken = res.accessToken || res.data?.accessToken;
+      const refresh = res.refreshToken || res.data?.refreshToken || null;
+      const user = res.user || res.data?.user || null;
+
+      if (!accessToken) throw new Error("No access token returned from Google");
+
+      localStorage.setItem(TOKEN_KEY, accessToken);
+      if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
+      if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+      await get().fetchProfile();
+
+      set({ token: accessToken, refreshToken: refresh, loading: false, error: null });
+      return { success: true, user };
+    } catch (err) {
+      console.error("Google login error:", err);
       set({ loading: false, error: err?.response?.data?.message || err.message });
       return { success: false, message: err?.response?.data?.message || err.message };
     }
@@ -68,7 +94,10 @@ const useAuthStore = create((set, get) => ({
       if (refresh) localStorage.setItem(REFRESH_KEY, refresh);
       if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
 
-      set({ token: accessToken, refreshToken: refresh, user, loading: false, error: null });
+      await get().fetchProfile();
+
+
+      set({ token: accessToken, refreshToken: refresh, loading: false, error: null });
       return { success: true, user };
     } catch (err) {
       console.error("Auth signup error:", err);
@@ -151,6 +180,88 @@ const useAuthStore = create((set, get) => ({
     } catch (err) {
       console.error("Reset password error:", err);
       return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+  sendOtp: async (email) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await apiSendOtp({ email });
+
+      set({ loading: false });
+      return { success: true, message: res.message || "OTP sent successfully" };
+    } catch (err) {
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+
+  verifyOtp: async (payload) => {
+    set({ loading: true, error: null });
+
+    try {
+      const res = await apiVerifyOtp(payload);
+      // backend creates account & returns tokens/user
+
+      const accessToken = res.accessToken || res.token || res.data?.accessToken;
+      const refresh = res.refreshToken || res.data?.refreshToken || null;
+      const user = res.user || res.data?.user || null;
+
+      if (accessToken) localStorage.setItem("token", accessToken);
+      if (refresh) localStorage.setItem("refreshToken", refresh);
+      if (user) localStorage.setItem("user", JSON.stringify(user));
+
+      set({
+        token: accessToken,
+        refreshToken: refresh,
+        user,
+        loading: false,
+        error: null
+      });
+
+      return { success: true, user };
+    } catch (err) {
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+
+  updateProfile: async (payload) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await updateProfile(payload);
+      const user = res.user || res.data?.user;
+
+      if (user) {
+        localStorage.setItem(USER_KEY, JSON.stringify(user));
+        set({ user, loading: false });
+      } else {
+        await get().fetchProfile();
+      }
+
+      return { success: true, user };
+    } catch (err) {
+      console.error("Update profile error:", err);
+      set({ loading: false, error: err?.response?.data?.message || err.message });
+      return { success: false, message: err?.response?.data?.message || err.message };
+    }
+  },
+
+  changePassword: async (payload) => {
+    set({ loading: true, error: null });
+    try {
+      const res = await changePasswordApi(payload);
+      set({ loading: false });
+
+      return { success: true, message: res.message };
+    } catch (err) {
+      set({
+        loading: false,
+        error: err?.response?.data?.message || err.message,
+      });
+      return {
+        success: false,
+        message: err?.response?.data?.message || err.message,
+      };
     }
   },
 }));

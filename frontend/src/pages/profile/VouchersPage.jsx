@@ -30,17 +30,10 @@ import {
 } from "lucide-react"
 import Navbar from "../../components/layout/Navbar"
 import Footer from "../../components/layout/Footer"
+import AccountSidebar from "../../components/profie/AccountSidebar"
+import MobileAccountNav from "../../components/profie/MobileAccountNav"
 
-// Sidebar links
-const sidebarLinks = [
-  { label: "Dashboard", href: "/account", icon: User },
-  { label: "My Orders", href: "/account/orders", icon: Package },
-  { label: "Wishlist", href: "/account/wishlist", icon: Heart },
-  { label: "Addresses", href: "/account/addresses", icon: MapPin },
-  { label: "Gift Vouchers", href: "/account/gift-vouchers", icon: Gift, active: true },
-  { label: "Payment Methods", href: "/account/payment", icon: CreditCard },
-  { label: "Settings", href: "/account/settings", icon: Settings },
-]
+
 
 // User data
 const userData = {
@@ -107,91 +100,8 @@ const statusConfig = {
   Expired: { color: "text-red-600", bgColor: "bg-red-100", icon: AlertCircle },
 }
 
-// Account Sidebar Component
-function AccountSidebar() {
-  return (
-    <aside className="hidden lg:block w-64 flex-shrink-0">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative">
-              <img
-                src={userData.avatar || "/placeholder.svg"}
-                alt={userData.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
-              />
-              <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
-                <Camera size={12} className="text-white" />
-              </button>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">{userData.name}</h3>
-              <p className="text-gray-400 text-sm">{userData.tier}</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-400">Loyalty Points</p>
-              <p className="font-bold text-lg">{userData.loyaltyPoints.toLocaleString()}</p>
-            </div>
-            <Gift size={24} className="text-red-400" />
-          </div>
-        </div>
 
-        <nav className="p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                  link.active ? "bg-red-50 text-red-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{link.label}</span>
-                {link.active && <ChevronRight size={16} className="ml-auto" />}
-              </Link>
-            )
-          })}
-        </nav>
 
-        <div className="p-3 border-t border-gray-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">
-            <LogOut size={20} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-// Mobile Navigation
-function MobileAccountNav() {
-  return (
-    <div className="lg:hidden mb-6 overflow-x-auto pb-2">
-      <div className="flex gap-2 min-w-max">
-        {sidebarLinks.map((link) => {
-          const Icon = link.icon
-          return (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
-                link.active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              <span>{link.label}</span>
-            </Link>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 // Voucher Card Component
 function VoucherCard({ voucher }) {
@@ -231,11 +141,11 @@ function VoucherCard({ voucher }) {
               </span>
             </div>
             <div className={`text-3xl font-black ${isUsable ? "text-white" : "text-gray-500"}`}>
-              ${voucher.balance.toFixed(2)}
+              ₹{voucher.balance.toFixed(2)}
             </div>
             {voucher.balance !== voucher.amount && (
               <p className={`text-sm ${isUsable ? "text-gray-400" : "text-gray-400"}`}>
-                of ${voucher.amount.toFixed(2)} original
+                of ₹{voucher.amount.toFixed(2)} original
               </p>
             )}
           </div>
@@ -281,7 +191,7 @@ function VoucherCard({ voucher }) {
         {/* Use Button */}
         {isUsable && (
           <Link
-            href="/products"
+            to="/category/all"
             className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors text-sm"
           >
             Use Voucher
@@ -350,7 +260,7 @@ function BuyGiftCardModal({ isOpen, onClose }) {
                         : "bg-gray-100 text-gray-900 hover:bg-gray-200"
                     }`}
                   >
-                    ${option.amount}
+                    ₹{option.amount}
                     {option.popular && (
                       <span className="absolute -top-2 -right-2 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded">
                         POPULAR
@@ -363,7 +273,7 @@ function BuyGiftCardModal({ isOpen, onClose }) {
               {/* Custom Amount */}
               <div className="mt-3">
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-semibold">₹</span>
                   <input
                     type="number"
                     placeholder="Custom amount"
@@ -377,7 +287,7 @@ function BuyGiftCardModal({ isOpen, onClose }) {
                     className="w-full h-12 pl-8 pr-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 transition-all"
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Min $10 - Max $500</p>
+                <p className="text-xs text-gray-500 mt-1">Min ₹10 - Max ₹500</p>
               </div>
             </div>
 
@@ -449,7 +359,7 @@ function BuyGiftCardModal({ isOpen, onClose }) {
           <div className="p-6 border-t border-gray-100 bg-gray-50">
             <div className="flex items-center justify-between mb-4">
               <span className="text-gray-600">Total</span>
-              <span className="text-2xl font-black text-gray-900">${customAmount || selectedAmount || 0}</span>
+              <span className="text-2xl font-black text-gray-900">₹{customAmount || selectedAmount || 0}</span>
             </div>
             <motion.button
               whileHover={{ scale: 1.01 }}
@@ -602,7 +512,7 @@ const VouchersPage = () => {
                 <div>
                   <p className="text-gray-400 text-sm mb-1">Available Balance</p>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black">${activeBalance.toFixed(2)}</span>
+                    <span className="text-4xl font-black">₹{activeBalance.toFixed(2)}</span>
                     <span className="text-gray-400">
                       across {activeVouchers.length} voucher{activeVouchers.length !== 1 ? "s" : ""}
                     </span>

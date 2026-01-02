@@ -1,7 +1,7 @@
 import React from 'react'
 import { HeroSkeleton, NavbarSkeleton, ProductGridSkeleton } from '../components/Skeletons'
 
-const loading = () => {
+const Loading = () => {
   return (
     <>
       <NavbarSkeleton />
@@ -14,4 +14,4 @@ const loading = () => {
   )
 }
 
-export default loading
+export default Loading;

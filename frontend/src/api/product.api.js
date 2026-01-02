@@ -42,3 +42,4 @@ export const searchProducts = async (payload) => {
   const res = await api.post("/products/search", payload);
   return res.data;
 };
+

@@ -2,14 +2,75 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const addressSchema = new mongoose.Schema({
-    fullName: String,
-    phone: String,
-    addressLine1: String,
-    addressLine2: String,
-    city: String,
-    state: String,
-    pincode: String,
-});
+    type: {
+        type: String,
+        enum: ["home", "work", "other"],
+        default: "home",
+    },
+
+    label: {
+        type: String,
+        trim: true,
+        default: "",
+    },
+
+    fullName: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+
+    phone: {
+        type: String,
+        required: true,
+        trim: true,
+        match: [/^[6-9]\d{9}$/, "Invalid phone number"],
+    },
+
+    addressLine1: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+
+    addressLine2: {
+        type: String,
+        trim: true,
+        default: "",
+    },
+
+    city: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+
+    state: {
+        type: String,
+        required: true,
+        trim: true,
+    },
+
+    pincode: {
+        type: String,
+        required: true,
+        match: [/^\d{6}$/, "Invalid pincode"],
+    },
+
+    country: {
+        type: String,
+        default: "India",
+    },
+
+    isDefault: {
+        type: Boolean,
+        default: false,
+    },
+},
+    {
+        timestamps: true,
+        _id: true,
+    });
 
 const userSchema = new mongoose.Schema(
     {
@@ -24,11 +85,32 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        phone: {
+            type: String,
+            trim: true,
+            default: "",
+            match: [
+                /^[6-9]\d{9}$/,
+                "Please enter a valid 10-digit phone number",
+            ],
+        },
         password: {
             type: String,
-            required: [true, "Password is required"],
+            required: function () {
+                return !this.googleId; // no password if logging in with Google
+            },
             minlength: [6, "Password must be at least 6 characters long"],
         },
+        googleId: {
+            type: String,
+            default: null,
+        },
+
+        avatar: {
+            type: String,
+            default: "",
+        },
+
         addresses: [addressSchema],
         cartItems: [
             {
@@ -53,8 +135,14 @@ const userSchema = new mongoose.Schema(
             enum: ["customer", "admin"],
             default: "customer",
         },
+        isVerified: {
+            type: Boolean,
+            default: false,
+        },
         resetPasswordToken: String,
         resetPasswordExpires: Date,
+        otp: String,
+        otpExpires: Date,
     },
     { timestamps: true }
 );

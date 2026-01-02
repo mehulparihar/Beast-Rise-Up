@@ -2,12 +2,12 @@ import React from 'react'
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Flame, Search, User, Heart, ShoppingCart, X, Menu, ChevronDown, Truck, RefreshCw, Shield, Sparkles } from "lucide-react"   
+import { Flame, Search, User, Heart, ShoppingCart, X, Menu, ChevronDown, Truck, RefreshCw, Shield, Sparkles } from "lucide-react"
 
 const navLinks = [
   { label: "Shop", href: "/category/all" },
   { label: "Men", href: "/category/men" },
-  { label: "Women", href: "/category/women"},
+  { label: "Women", href: "/category/women" },
   { label: "Streetwear", href: "/category/streetwear" },
   { label: "Gymwear", href: "/category/gymwear" },
   { label: "New Arrivals", href: "/category" },
@@ -19,14 +19,16 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
-      
-        useEffect(() => {
-          const handleScroll = () => {
-            setIsScrolled(window.scrollY > 50)
-          }
-          window.addEventListener("scroll", handleScroll)
-          return () => window.removeEventListener("scroll", handleScroll)
-        }, [])
+  const [searchValue, setSearchValue] = useState("")
+
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
   const navigate = useNavigate();
 
   return (
@@ -79,6 +81,14 @@ const Navbar = () => {
                   <input
                     type="text"
                     placeholder="Search for products, collections, styles..."
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && searchValue.trim()) {
+                        navigate(`/search/${encodeURIComponent(searchValue.trim())}`)
+                        setSearchValue("")
+                      }
+                    }}
                     className="w-full h-11 pl-12 pr-4 text-sm bg-gray-50 border-2 border-transparent rounded-lg focus:outline-none focus:border-red-500 focus:bg-white transition-all placeholder:text-gray-400"
                   />
                   <Search
@@ -105,7 +115,7 @@ const Navbar = () => {
 
                 {/* Account */}
                 <motion.button
-                    onClick={() => navigate("/account")}
+                  onClick={() => navigate("/account")}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 text-gray-700 transition-colors"
@@ -133,7 +143,7 @@ const Navbar = () => {
                   className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900 text-white font-semibold transition-colors hover:bg-gray-800"
                 >
                   <ShoppingCart size={18} />
-                  <span className="text-sm">$249.99</span>
+                  <span className="text-sm">₹249.99</span>
                   <span className="flex items-center justify-center min-w-5 h-5 px-1 text-xs font-bold bg-red-500 text-white rounded-full">
                     3
                   </span>
@@ -203,6 +213,15 @@ const Navbar = () => {
                 <div className="relative">
                   <input
                     type="text"
+                    value={searchValue}
+                    onChange={(e) => setSearchValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && searchValue.trim()) {
+                        navigate(`/search/${encodeURIComponent(searchValue.trim())}`)
+                        setSearchOpen(false)
+                        setSearchValue("")
+                      }
+                    }}
                     placeholder="Search products..."
                     autoFocus
                     className="w-full h-12 pl-12 pr-12 text-sm bg-gray-50 border-2 border-transparent rounded-xl focus:outline-none focus:border-red-500 focus:bg-white transition-all placeholder:text-gray-400"

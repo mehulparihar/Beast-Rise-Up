@@ -27,117 +27,12 @@ import {
 } from "lucide-react"
 import Navbar from "../../components/layout/Navbar"
 import Footer from "../../components/layout/Footer"
+import AccountSidebar from "../../components/profie/AccountSidebar"
+import MobileAccountNav from "../../components/profie/MobileAccountNav"
+import useAuthStore from "../../stores/useAuthStore"
 
-// Sidebar navigation items
-const sidebarLinks = [
-  { label: "Dashboard", href: "/account", icon: User },
-  { label: "My Orders", href: "/account/orders", icon: Package },
-  { label: "Wishlist", href: "/account/wishlist", icon: Heart },
-  { label: "Addresses", href: "/account/addresses", icon: MapPin },
-  { label: "Gift Vouchers", href: "/account/gift-vouchers", icon: Gift },
-  { label: "Payment Methods", href: "/account/payment", icon: CreditCard },
-  { label: "Settings", href: "/account/settings", icon: Settings, active: true },
-]
 
-// Mock user data
-const userData = {
-  name: "Marcus Johnson",
-  email: "marcus.johnson@example.com",
-  phone: "+1 (555) 123-4567",
-  avatar: "/male-fitness-avatar.jpg",
-  memberSince: "January 2024",
-  loyaltyPoints: 2450,
-  tier: "Gold Member",
-}
 
-// Account Sidebar Component
-function AccountSidebar() {
-  return (
-    <aside className="hidden lg:block w-64 flex-shrink-0">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
-        {/* User Profile Card */}
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative">
-              <img
-                src={userData.avatar || "/placeholder.svg"}
-                alt={userData.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
-              />
-              <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
-                <Camera size={12} className="text-white" />
-              </button>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">{userData.name}</h3>
-              <p className="text-gray-400 text-sm">{userData.tier}</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-400">Loyalty Points</p>
-              <p className="font-bold text-lg">{userData.loyaltyPoints.toLocaleString()}</p>
-            </div>
-            <Gift size={24} className="text-red-400" />
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                  link.active ? "bg-red-50 text-red-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{link.label}</span>
-                {link.active && <ChevronRight size={16} className="ml-auto" />}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Logout Button */}
-        <div className="p-3 border-t border-gray-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">
-            <LogOut size={20} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-// Mobile Account Navigation
-function MobileAccountNav() {
-  return (
-    <div className="lg:hidden mb-6 overflow-x-auto pb-2">
-      <div className="flex gap-2 min-w-max">
-        {sidebarLinks.map((link) => {
-          const Icon = link.icon
-          return (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
-                link.active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              <span>{link.label}</span>
-            </Link>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 // Toggle Switch Component
 function ToggleSwitch({ enabled, onChange }) {
@@ -147,9 +42,8 @@ function ToggleSwitch({ enabled, onChange }) {
       className={`relative w-12 h-6 rounded-full transition-colors ${enabled ? "bg-red-500" : "bg-gray-300"}`}
     >
       <span
-        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${
-          enabled ? "translate-x-7" : "translate-x-1"
-        }`}
+        className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${enabled ? "translate-x-7" : "translate-x-1"
+          }`}
       />
     </button>
   )
@@ -157,17 +51,101 @@ function ToggleSwitch({ enabled, onChange }) {
 
 const SettingsPage = () => {
   const [showPassword, setShowPassword] = useState(false)
-  
+
   const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
     push: true,
     marketing: false,
   })
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [profile, setProfile] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    avatar: "",
+    phone: "",
+  })
+
   const [preferences, setPreferences] = useState({
     darkMode: false,
     twoFactor: false,
   })
+  const { user, loading, fetchProfile, updateProfile, changePassword, logout } = useAuthStore();
+
+  useEffect(() => {
+    if (!user && !loading) {
+      fetchProfile();
+      console.log("User data in ProfilePage:", user);
+    }
+  }, [user, loading]);
+  useEffect(() => {
+    if (user) {
+      const parts = user.name.trim().split(" ");
+      const firstName = parts[0] || "";
+      const lastName = parts.length > 1 ? parts.slice(1).join(" ") : "";
+      setProfile({
+        firstName,
+        lastName,
+        email: user.email || "",
+        avatar: user.avatar || "",
+        phone: user.phone || "",
+      })
+    }
+  }, [user])
+
+  const handlePasswordUpdate = async () => {
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      return alert("Passwords do not match");
+    }
+
+    if(passwordForm.newPassword.length < 6) {
+      return alert("New password must be at least 6 characters long");
+    }
+
+    const confirm = window.confirm(
+      "Changing password will log you out. Continue?"
+    );
+    if (!confirm) return;
+
+    const res = await changePassword({
+      currentPassword: passwordForm.currentPassword,
+      newPassword: passwordForm.newPassword,
+    });
+
+    if (res.success) {
+      alert("✅ Password updated. Please login again.");
+      await logout();
+    } else {
+      alert(`❌ ${res.message}`);
+    }
+  };
+
+
+  const handleProfileUpdate = async () => {
+    const confirm = window.confirm("Are you sure you want to save changes?");
+    if (!confirm) return;
+
+    const payload = {
+      name: `${profile.firstName} ${profile.lastName}`.trim(),
+      email: profile.email,
+      phone: profile.phone,
+      avatar: profile.avatar,
+    };
+
+    const res = await updateProfile(payload);
+
+    if (res.success) {
+      alert("✅ Profile updated successfully");
+    } else {
+      alert("❌ Failed to update profile");
+    }
+
+  }
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -219,8 +197,8 @@ const SettingsPage = () => {
                   <div className="flex items-center gap-6">
                     <div className="relative">
                       <img
-                        src={userData.avatar || "/placeholder.svg"}
-                        alt={userData.name}
+                        src={profile.avatar || "/placeholder.svg"}
+                        alt={profile.firstName}
                         className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
                       />
                       <button className="absolute -bottom-1 -right-1 w-8 h-8 bg-gray-900 rounded-full flex items-center justify-center hover:bg-gray-800 transition-colors">
@@ -239,7 +217,8 @@ const SettingsPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                       <input
                         type="text"
-                        defaultValue="Marcus"
+                        value={profile.firstName}
+                        onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                       />
                     </div>
@@ -247,7 +226,10 @@ const SettingsPage = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                       <input
                         type="text"
-                        defaultValue="Johnson"
+                        value={profile.lastName}
+                        onChange={(e) =>
+                          setProfile({ ...profile, lastName: e.target.value })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                       />
                     </div>
@@ -260,7 +242,10 @@ const SettingsPage = () => {
                     </label>
                     <input
                       type="email"
-                      defaultValue={userData.email}
+                      value={profile.email}
+                      onChange={(e) =>
+                        setProfile({ ...profile, email: e.target.value })
+                      }
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
@@ -272,12 +257,16 @@ const SettingsPage = () => {
                     </label>
                     <input
                       type="tel"
-                      defaultValue={userData.phone}
+                      value={profile.phone}
+                      onChange={(e) =>
+                        setProfile({ ...profile, phone: e.target.value })
+                      }
                       className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     />
                   </div>
 
-                  <button className="px-6 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors">
+                  <button className="px-6 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors"
+                    onClick={handleProfileUpdate} >
                     Save Changes
                   </button>
                 </div>
@@ -302,6 +291,10 @@ const SettingsPage = () => {
                       <input
                         type={showPassword ? "text" : "password"}
                         placeholder="Enter current password"
+                        value={passwordForm.currentPassword}
+                        onChange={(e) =>
+                          setPasswordForm({ ...passwordForm, currentPassword: e.target.value })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent pr-12"
                       />
                       <button
@@ -320,6 +313,10 @@ const SettingsPage = () => {
                       <input
                         type="password"
                         placeholder="Enter new password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) =>
+                          setPasswordForm({ ...passwordForm, newPassword: e.target.value })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                       />
                     </div>
@@ -328,6 +325,10 @@ const SettingsPage = () => {
                       <input
                         type="password"
                         placeholder="Confirm new password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) =>
+                          setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })
+                        }
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                       />
                     </div>
@@ -350,7 +351,8 @@ const SettingsPage = () => {
                     />
                   </div>
 
-                  <button className="px-6 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors">
+                  <button className="px-6 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors"
+                    onClick={handlePasswordUpdate} >
                     Update Password
                   </button>
                 </div>

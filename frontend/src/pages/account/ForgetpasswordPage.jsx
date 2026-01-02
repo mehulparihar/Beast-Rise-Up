@@ -5,13 +5,16 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { Flame, Mail, ArrowLeft, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Link } from "react-router-dom"
+import useAuthStore from "../../stores/useAuthStore"
 
 
 const ForgetpasswordPage = () => {
-   const [email, setEmail] = useState("")
+  const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
+
+  const forgotPassword = useAuthStore((state) => state.forgotPassword);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -19,16 +22,16 @@ const ForgetpasswordPage = () => {
     setIsLoading(true)
 
     // Simulate API call - replace with actual password reset logic
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const res = await forgotPassword(email)
 
-    if (email) {
+    setIsLoading(false)
+    if (res.success) {
       setIsSuccess(true)
-      console.log("Password reset email sent to:", email)
+      // console.log("Password reset email sent to:", email)
     } else {
       setError("Please enter your email address")
     }
 
-    setIsLoading(false)
   }
 
   const containerVariants = {
@@ -56,7 +59,7 @@ const ForgetpasswordPage = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
                 <Flame className="text-red-500" size={24} />
@@ -126,7 +129,7 @@ const ForgetpasswordPage = () => {
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full max-w-md">
           {/* Mobile Logo */}
           <motion.div variants={itemVariants} className="lg:hidden mb-8">
-            <Link href="/" className="flex items-center gap-3 justify-center">
+            <Link to="/" className="flex items-center gap-3 justify-center">
               <div className="w-11 h-11 bg-gray-900 rounded-lg flex items-center justify-center">
                 <Flame className="text-red-500" size={22} />
               </div>
@@ -140,7 +143,7 @@ const ForgetpasswordPage = () => {
           {/* Back Link */}
           <motion.div variants={itemVariants}>
             <Link
-              href="/login"
+              to="/login"
               className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 text-sm font-medium transition-colors mb-8"
             >
               <ArrowLeft size={16} />
@@ -227,14 +230,20 @@ const ForgetpasswordPage = () => {
               <p className="text-sm text-gray-400 mb-6">
                 Didn't receive the email? Check your spam folder or{" "}
                 <button
-                  onClick={() => setIsSuccess(false)}
+                  onClick={() => {
+                    setIsSuccess(false);
+                    setEmail("");
+                    setError("");
+                    setIsLoading(false);
+                    window.location.reload()
+                  }}
                   className="text-red-600 font-semibold hover:text-red-700 transition-colors"
                 >
                   try again
                 </button>
               </p>
               <Link
-                href="/login"
+                to="/login"
                 className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors w-full"
               >
                 <ArrowLeft size={18} />
@@ -246,7 +255,7 @@ const ForgetpasswordPage = () => {
           {/* Terms */}
           <motion.p variants={itemVariants} className="mt-8 text-center text-xs text-gray-400 leading-relaxed">
             Remember your password?{" "}
-            <Link href="/login" className="text-red-600 hover:text-red-700 font-semibold transition-colors">
+            <Link to="/login" className="text-red-600 hover:text-red-700 font-semibold transition-colors">
               Sign in
             </Link>
           </motion.p>

@@ -4,7 +4,7 @@
  * - minimal caching of recent orders
  */
 
-import create from "zustand";
+import {create} from "zustand";
 import { createOrder as apiCreateOrder, getMyOrders as apiGetMyOrders, getOrderById as apiGetOrderById } from "../api/order.api";
 
 const ORD_KEY = "orders_recent_v1";

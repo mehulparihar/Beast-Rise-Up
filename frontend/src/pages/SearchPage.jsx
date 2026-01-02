@@ -21,10 +21,15 @@ import {
   Sparkles,
   TrendingUp,
   Tag,
+  ShoppingCart
 } from "lucide-react"
-import { Link, useSearchParams, useNavigate } from "react-router-dom"
+import { Link, useSearchParams, useNavigate, useParams } from "react-router-dom"
 import Navbar from "../components/layout/Navbar"
 import Footer from "../components/layout/Footer"
+import useProductStore from "../stores/useProductStore"
+import useCartStore from "../stores/useCartStore"
+import useWishlistStore from "../stores/useWishlistStore"
+import Loading from "./Loading"
 
 // Product data
 const allProducts = [
@@ -144,24 +149,198 @@ const allProducts = [
 
 const categories = ["All", "Hoodies", "T-Shirts", "Pants", "Jackets", "Footwear", "Accessories"]
 const sortOptions = [
-  { value: "relevance", label: "Relevance" },
-  { value: "price-low", label: "Price: Low to High" },
-  { value: "price-high", label: "Price: High to Low" },
-  { value: "rating", label: "Top Rated" },
-  { value: "newest", label: "Newest" },
+  { label: "Relevance", value: "relevance" },
+  { label: "Newest", value: "newest" },
+  { label: "Price: Low to High", value: "price-asc" },
+  { label: "Price: High to Low", value: "price-desc" },
+  { label: "Top Rated", value: "rating" },
+  { label: "Best Selling", value: "bestselling" },
 ]
 const priceRanges = [
   { value: "all", label: "All Prices" },
-  { value: "0-50", label: "Under $50" },
-  { value: "50-100", label: "$50 - $100" },
-  { value: "100-200", label: "$100 - $200" },
-  { value: "200+", label: "$200+" },
+  { value: "0-50", label: "Under ₹50" },
+  { value: "50-100", label: "₹50 - ₹100" },
+  { value: "100-200", label: "₹100 - ₹200" },
+  { value: "200+", label: "₹200+" },
 ]
 
+function ProductCard({
+  product,
+  title,
+  price,
+  originalPrice,
+  image,
+  badge,
+  rating,
+  reviews,
+  onAddToCart,
+  onToggleWishlist,
+  isWishlisted,
+  viewMode = "grid",
+}) {
+  const [isFavorited, setIsFavorited] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
+  const navigate = useNavigate();
+
+  if (viewMode === "list") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        viewport={{ once: true }}
+        onClick={() => navigate(`/product/${product._id}`)}
+        className="flex gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-shadow cursor-pointer"
+      >
+        <div className="relative w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+          {badge && (
+            <span
+              className={`absolute top-2 left-2 z-10 px-2 py-0.5 text-xs font-bold rounded-full ${badge === "NEW"
+                ? "bg-gray-900 text-white"
+                : badge === "SALE"
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-900 border border-gray-200"
+                }`}
+            >
+              {badge}
+            </span>
+          )}
+          <img src={image || "/placeholder.svg"} alt={title} className="object-cover" />
+        </div>
+        <div className="flex-1 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-1">
+                <Star size={14} className="fill-red-500 text-red-500" />
+                <span className="text-sm font-medium text-gray-900">{rating}</span>
+              </div>
+              <span className="text-sm text-gray-500">({reviews} reviews)</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-bold text-gray-900">₹{price?.toFixed(2)}</p>
+              {originalPrice && <p className="text-gray-400 text-sm line-through">₹{originalPrice?.toFixed(2)}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleWishlist(product._id);
+                }}
+                className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+              >
+                <Heart size={18} className={isWishlisted ? "fill-red-600 text-red-600" : "text-gray-400"} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCart(product, 1);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors text-sm">
+                <ShoppingCart size={16} />
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      viewport={{ once: true }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
+      className="group"
+    >
+      <div
+        onClick={() => navigate(`/product/${product._id}`)}
+        className="relative mb-3 rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] shadow-sm cursor-pointer"
+      >
+        {badge && (
+          <div className="absolute top-3 left-3 z-10">
+            <span
+              className={`inline-block px-3 py-1 text-xs font-bold rounded-full ${badge === "NEW"
+                ? "bg-gray-900 text-white"
+                : badge === "SALE"
+                  ? "bg-red-600 text-white"
+                  : "bg-white text-gray-900 border border-gray-200 shadow-sm"
+                }`}
+            >
+              {badge}
+            </span>
+          </div>
+        )}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleWishlist(product._id);
+          }}
+          className="absolute top-3 right-3 z-10 p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-shadow"
+        >
+          <Heart
+            size={18}
+            className={`${isWishlisted ? "fill-red-600 text-red-600" : "text-gray-400 hover:text-red-600"} transition-colors`}
+          />
+        </motion.button>
+        <img
+          src={image || "/placeholder.svg"}
+          alt={title}
+          className="object-cover group-hover:scale-105 transition-transform duration-500"
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 20 }}
+          className="absolute bottom-3 left-3 right-3"
+        >
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product, 1);
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors text-sm shadow-lg"
+          >
+            <ShoppingCart size={16} />
+            Add to Cart
+          </motion.button>
+        </motion.div>
+      </div>
+      <div>
+        <h3
+          onClick={() => navigate(`/product/${product._id}`)}
+          className="font-semibold text-gray-900 mb-1 group-hover:text-red-600 transition-colors line-clamp-1 cursor-pointer">
+          {title}
+        </h3>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-1">
+            <Star size={14} className="fill-red-500 text-red-500" />
+            <span className="text-sm font-medium text-gray-900">{rating}</span>
+          </div>
+          <span className="text-sm text-gray-500">({reviews})</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <p className="text-gray-900 font-bold">₹{price?.toFixed(2)}</p>
+          {originalPrice && <p className="text-gray-400 text-sm line-through">₹{originalPrice.toFixed(2)}</p>}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 const SearchPage = () => {
-   const [searchParams] = useSearchParams()
+  const { searchParams } = useParams()
   const router = useNavigate()
-  const initialQuery = searchParams.get("q") || ""
+  const initialQuery = searchParams || ""
 
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [inputValue, setInputValue] = useState(initialQuery)
@@ -169,15 +348,26 @@ const SearchPage = () => {
   const [sortBy, setSortBy] = useState("relevance")
   const [priceRange, setPriceRange] = useState("all")
   const [viewMode, setViewMode] = useState("grid")
-  const [wishlist, setWishlist] = useState([])
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [showMobileSearch, setShowMobileSearch] = useState(false) // State for mobile search visibility
-  
+
+  const {
+    list: products,
+    loading,
+    filters,
+    setFilters,
+    setPage,
+    loadProducts,
+    loadByCategory,
+  } = useProductStore();
+
+  const { addToCart } = useCartStore();
+  const { add, remove, wishlist } = useWishlistStore();
 
   // Update search query from URL params
   useEffect(() => {
-    const q = searchParams.get("q")
+    const q = searchParams
     if (q) {
       setSearchQuery(q)
       setInputValue(q)
@@ -188,83 +378,64 @@ const SearchPage = () => {
     }
   }, [searchParams])
 
+  useEffect(() => {   
+      loadProducts()
+  }, [])
+
+
   // Filter and sort products
   const filteredProducts = useMemo(() => {
-    let results = [...allProducts]
+    let results = [...products]
 
-    // Search filter
+    // Search
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      results = results.filter(
-        (product) =>
-          product.name.toLowerCase().includes(query) ||
-          product.category.toLowerCase().includes(query) ||
-          product.colors.some((c) => c.toLowerCase().includes(query)),
+      const q = searchQuery.toLowerCase()
+      results = results.filter((p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.category?.toLowerCase().includes(q) ||
+        p.tags?.some((t) => t.toLowerCase().includes(q))
       )
     }
 
-    // Category filter
+    // Category
     if (selectedCategory !== "All") {
-      results = results.filter((product) => product.category === selectedCategory)
+      results = results.filter(
+        (p) => p.category === selectedCategory
+      )
     }
 
-    // Price range filter
+    // Price range
     if (priceRange !== "all") {
-      results = results.filter((product) => {
-        const price = product.price
-        switch (priceRange) {
-          case "0-50":
-            return price < 50
-          case "50-100":
-            return price >= 50 && price < 100
-          case "100-200":
-            return price >= 100 && price < 200
-          case "200+":
-            return price >= 200
-          default:
-            return true
-        }
+      results = results.filter((p) => {
+        const price = p.variants?.[0]?.discountedPrice || 0
+        if (priceRange === "0-50") return price < 50
+        if (priceRange === "50-100") return price >= 50 && price < 100
+        if (priceRange === "100-200") return price >= 100 && price < 200
+        if (priceRange === "200+") return price >= 200
+        return true
       })
     }
 
     // Sort
-    switch (sortBy) {
-      case "price-low":
-        results.sort((a, b) => a.price - b.price)
-        break
-      case "price-high":
-        results.sort((a, b) => b.price - a.price)
-        break
-      case "rating":
-        results.sort((a, b) => b.rating - a.rating)
-        break
-      case "newest":
-        results.sort((a, b) => (b.isNew ? 1 : 0) - (a.isNew ? 1 : 0))
-        break
-      case "relevance": // Default sort by relevance if nothing else is selected
-      default:
-        // If sort is relevance and there's a search query, sort by relevance
-        if (sortBy === "relevance" && searchQuery) {
-          const query = searchQuery.toLowerCase()
-          results.sort((a, b) => {
-            const aMatch =
-              a.name.toLowerCase().includes(query) ||
-              a.category.toLowerCase().includes(query) ||
-              a.colors.some((c) => c.toLowerCase().includes(query))
-            const bMatch =
-              b.name.toLowerCase().includes(query) ||
-              b.category.toLowerCase().includes(query) ||
-              b.colors.some((c) => c.toLowerCase().includes(query))
-            if (aMatch && !bMatch) return -1
-            if (!aMatch && bMatch) return 1
-            return 0
-          })
-        }
-        break
+    if (sortBy === "price-asc") {
+      results.sort((a, b) =>
+        a.variants[0].discountedPrice - b.variants[0].discountedPrice
+      )
+    }
+
+    if (sortBy === "price-desc") {
+      results.sort((a, b) =>
+        b.variants[0].discountedPrice - a.variants[0].discountedPrice
+      )
+    }
+
+    if (sortBy === "rating") {
+      results.sort((a, b) => b.ratingAverage - a.ratingAverage)
     }
 
     return results
-  }, [searchQuery, selectedCategory, sortBy, priceRange])
+  }, [products, searchQuery, selectedCategory, priceRange, sortBy])
+
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -280,9 +451,7 @@ const SearchPage = () => {
     setShowMobileSearch(false) // Close mobile search on submit
   }
 
-  const toggleWishlist = (productId) => {
-    setWishlist((prev) => (prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]))
-  }
+  
 
   const clearFilters = () => {
     setSelectedCategory("All")
@@ -300,17 +469,21 @@ const SearchPage = () => {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   }
 
+  if (loading) {
+    return <Loading />
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <Navbar/>
+      <Navbar />
 
       <section className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-              <Link href="/" className="hover:text-gray-900 transition-colors">
+              <Link to="/" className="hover:text-gray-900 transition-colors">
                 Home
               </Link>
               <span>/</span>
@@ -434,9 +607,8 @@ const SearchPage = () => {
                         setSortBy(option.value)
                         setSortDropdownOpen(false)
                       }}
-                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${
-                        sortBy === option.value ? "text-red-600 font-medium" : "text-gray-700"
-                      }`}
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 transition-colors ${sortBy === option.value ? "text-red-600 font-medium" : "text-gray-700"
+                        }`}
                     >
                       {option.label}
                     </button>
@@ -482,11 +654,10 @@ const SearchPage = () => {
                     <button
                       key={category}
                       onClick={() => setSelectedCategory(category)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        selectedCategory === category
-                          ? "bg-gray-900 text-white font-medium"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === category
+                        ? "bg-gray-900 text-white font-medium"
+                        : "text-gray-600 hover:bg-gray-100"
+                        }`}
                     >
                       {category}
                     </button>
@@ -502,11 +673,10 @@ const SearchPage = () => {
                     <button
                       key={range.value}
                       onClick={() => setPriceRange(range.value)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                        priceRange === range.value
-                          ? "bg-gray-900 text-white font-medium"
-                          : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${priceRange === range.value
+                        ? "bg-gray-900 text-white font-medium"
+                        : "text-gray-600 hover:bg-gray-100"
+                        }`}
                     >
                       {range.label}
                     </button>
@@ -549,11 +719,10 @@ const SearchPage = () => {
                         <button
                           key={category}
                           onClick={() => setSelectedCategory(category)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                            selectedCategory === category
-                              ? "bg-gray-900 text-white font-medium"
-                              : "text-gray-600 hover:bg-gray-100"
-                          }`}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === category
+                            ? "bg-gray-900 text-white font-medium"
+                            : "text-gray-600 hover:bg-gray-100"
+                            }`}
                         >
                           {category}
                         </button>
@@ -569,11 +738,10 @@ const SearchPage = () => {
                         <button
                           key={range.value}
                           onClick={() => setPriceRange(range.value)}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
-                            priceRange === range.value
-                              ? "bg-gray-900 text-white font-medium"
-                              : "text-gray-600 hover:bg-gray-100"
-                          }`}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${priceRange === range.value
+                            ? "bg-gray-900 text-white font-medium"
+                            : "text-gray-600 hover:bg-gray-100"
+                            }`}
                         >
                           {range.label}
                         </button>
@@ -607,124 +775,45 @@ const SearchPage = () => {
                 }
               >
                 {filteredProducts.map((product) => (
-                  <motion.div key={product.id} variants={itemVariants}>
+                  <motion.div key={product._id} variants={itemVariants}>
                     {viewMode === "grid" ? (
                       // Grid View Card
-                      <div className="group bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="relative aspect-square bg-gray-100 overflow-hidden">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.name}
-                            fill
-                            className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          {/* Badges */}
-                          <div className="absolute top-3 left-3 flex flex-col gap-2">
-                            {product.isNew && (
-                              <span className="px-2 py-1 bg-gray-900 text-white text-xs font-bold rounded">NEW</span>
-                            )}
-                            {product.isSale && (
-                              <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">SALE</span>
-                            )}
-                          </div>
-                          {/* Wishlist Button */}
-                          <button
-                            onClick={() => toggleWishlist(product.id)}
-                            className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-colors ${
-                              wishlist.includes(product.id)
-                                ? "bg-red-500 text-white"
-                                : "bg-white/90 text-gray-600 hover:bg-white"
-                            }`}
-                          >
-                            <Heart size={18} fill={wishlist.includes(product.id) ? "currentColor" : "none"} />
-                          </button>
-                          {/* Quick Add */}
-                          <div className="absolute inset-x-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button className="w-full py-2.5 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 transition-colors">
-                              Quick Add
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <p className="text-xs text-gray-500 mb-1">{product.category}</p>
-                          <h3 className="font-bold text-gray-900 mb-2 line-clamp-1">{product.name}</h3>
-                          <div className="flex items-center gap-1 mb-2">
-                            <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                            <span className="text-sm text-gray-600">
-                              {product.rating} ({product.reviews})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-900">${product.price}</span>
-                            {product.originalPrice && (
-                              <span className="text-sm text-gray-400 line-through">${product.originalPrice}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <ProductCard
+                        product={product}
+                        key={product._id}
+                        title={product.title}
+                        price={product.variants[0].discountedPrice}
+                        originalPrice={product.variants[0].price}
+                        image={product.defaultImage}
+                        badge={product.isFeatured ? "Featured" : null}
+                        rating={product.ratingAverage}
+                        reviews={product.ratingCount}
+                        viewMode="grid"
+                        onAddToCart={(product, qty) => addToCart(product, qty)}
+                        isWishlisted={wishlist.includes(product._id)}
+                        onToggleWishlist={(id) =>
+                          wishlist.includes(id) ? remove(id) : add(id)
+                        }
+                      />
                     ) : (
                       // List View Card
-                      <div className="flex bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow">
-                        <div className="relative w-40 sm:w-52 flex-shrink-0 bg-gray-100">
-                          <img
-                            src={product.image || "/placeholder.svg"}
-                            alt={product.name}
-                            fill
-                            className="object-cover"
-                          />
-                          {/* Badges */}
-                          <div className="absolute top-3 left-3 flex flex-col gap-2">
-                            {product.isNew && (
-                              <span className="px-2 py-1 bg-gray-900 text-white text-xs font-bold rounded">NEW</span>
-                            )}
-                            {product.isSale && (
-                              <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded">SALE</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex-1 p-4 sm:p-6 flex flex-col justify-between">
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">{product.category}</p>
-                            <h3 className="font-bold text-gray-900 text-lg mb-2">{product.name}</h3>
-                            <div className="flex items-center gap-1 mb-3">
-                              <Star size={14} className="text-yellow-400 fill-yellow-400" />
-                              <span className="text-sm text-gray-600">
-                                {product.rating} ({product.reviews} reviews)
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {product.colors.map((color) => (
-                                <span key={color} className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                                  {color}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl font-bold text-gray-900">${product.price}</span>
-                              {product.originalPrice && (
-                                <span className="text-sm text-gray-400 line-through">${product.originalPrice}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => toggleWishlist(product.id)}
-                                className={`p-2.5 rounded-lg transition-colors ${
-                                  wishlist.includes(product.id)
-                                    ? "bg-red-100 text-red-500"
-                                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                                }`}
-                              >
-                                <Heart size={18} fill={wishlist.includes(product.id) ? "currentColor" : "none"} />
-                              </button>
-                              <button className="px-5 py-2.5 bg-gray-900 text-white font-bold text-sm rounded-lg hover:bg-gray-800 transition-colors">
-                                Add to Cart
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                      <ProductCard
+                        product={product}
+                        key={product._id}
+                        title={product.title}
+                        price={product.variants[0].discountedPrice}
+                        originalPrice={product.variants[0].price}
+                        image={product.defaultImage}
+                        badge={product.isFeatured ? "Featured" : null}
+                        rating={product.ratingAverage}
+                        reviews={product.ratingCount}
+                        viewMode="list"
+                        onAddToCart={(product, qty) => addToCart(product, qty)}
+                        isWishlisted={wishlist.includes(product._id)}
+                        onToggleWishlist={(id) =>
+                          wishlist.includes(id) ? remove(id) : add(id)
+                        }
+                      />
                     )}
                   </motion.div>
                 ))}
@@ -752,7 +841,7 @@ const SearchPage = () => {
       </main>
 
       {/* Footer */}
-      <Footer/>
+      <Footer />
     </div>
   )
 }

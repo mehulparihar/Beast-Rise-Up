@@ -4,8 +4,8 @@
  * - sync with backend
  */
 
-import create from "zustand";
-import { getWishlist, toggleWishlist as apiToggleWishlist, removeWishlistItem as apiRemoveWishlistItem } from "../api/wishlist.api";
+import { create } from "zustand";
+import { getWishlist, addWishlist as apiAddWishlist, removeWishlistItem as apiRemoveWishlistItem } from "../api/wishlist.api";
 
 const W_KEY = "wishlist_v1";
 
@@ -34,27 +34,21 @@ const useWishlistStore = create((set, get) => ({
     }
   },
 
-  toggle: async (productId) => {
+  add: async (productId) => {
     const prev = get().wishlist;
+    if (prev.includes(productId)) return { success: true };
+
+    const next = [...prev, productId];
+    set({ wishlist: next });
+    localStorage.setItem(W_KEY, JSON.stringify(next));
+
     try {
-      // optimistic update
-      const exists = prev.find((p) => (p._id || p) === productId || (p.product && p.product._id === productId));
-      let next;
-      if (exists) next = prev.filter((p) => (p._id || p) !== productId && !(p.product && p.product._id === productId));
-      else next = [...prev, productId];
-
-      set({ wishlist: next });
-      localStorage.setItem(W_KEY, JSON.stringify(next));
-
-      await apiToggleWishlist({ productId });
-      // re-load server version to be safe
-      await get().loadWishlist();
+      await apiAddWishlist({ productId });
       return { success: true };
     } catch (err) {
-      console.error("Toggle wishlist error:", err);
       set({ wishlist: prev });
       localStorage.setItem(W_KEY, JSON.stringify(prev));
-      return { success: false, message: err?.message || err?.response?.data?.message };
+      return { success: false };
     }
   },
 

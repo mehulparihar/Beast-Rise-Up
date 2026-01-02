@@ -28,25 +28,11 @@ import {
 import { Link } from "react-router-dom"
 import Navbar from "../../components/layout/Navbar"
 import Footer from "../../components/layout/Footer"
+import AccountSidebar from "../../components/profie/AccountSidebar"
+import MobileAccountNav from "../../components/profie/MobileAccountNav"
+import useAuthStore from "../../stores/useAuthStore"
 
-// Sidebar links
-const sidebarLinks = [
-  { label: "Dashboard", href: "/account", icon: User },
-  { label: "My Orders", href: "/account/orders", icon: Package },
-  { label: "Wishlist", href: "/account/wishlist", icon: Heart },
-  { label: "Addresses", href: "/account/addresses", icon: MapPin, active: true },
-  { label: "Gift Vouchers", href: "/account/gift-vouchers", icon: Gift },
-  { label: "Payment Methods", href: "/account/payment", icon: CreditCard },
-  { label: "Settings", href: "/account/settings", icon: Settings },
-]
 
-// User data
-const userData = {
-  name: "Marcus Johnson",
-  avatar: "/male-fitness-avatar.jpg",
-  loyaltyPoints: 2450,
-  tier: "Gold Member",
-}
 
 // Initial addresses
 const initialAddresses = [
@@ -82,91 +68,8 @@ const initialAddresses = [
 
 
 
-// Account Sidebar Component
-function AccountSidebar() {
-  return (
-    <aside className="hidden lg:block w-64 flex-shrink-0">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative">
-              <img
-                src={userData.avatar || "/placeholder.svg"}
-                alt={userData.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
-              />
-              <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
-                <Camera size={12} className="text-white" />
-              </button>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">{userData.name}</h3>
-              <p className="text-gray-400 text-sm">{userData.tier}</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-400">Loyalty Points</p>
-              <p className="font-bold text-lg">{userData.loyaltyPoints.toLocaleString()}</p>
-            </div>
-            <Gift size={24} className="text-red-400" />
-          </div>
-        </div>
 
-        <nav className="p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                  link.active ? "bg-red-50 text-red-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{link.label}</span>
-                {link.active && <ChevronRight size={16} className="ml-auto" />}
-              </Link>
-            )
-          })}
-        </nav>
 
-        <div className="p-3 border-t border-gray-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">
-            <LogOut size={20} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-// Mobile Navigation
-function MobileAccountNav() {
-  return (
-    <div className="lg:hidden mb-6 overflow-x-auto pb-2">
-      <div className="flex gap-2 min-w-max">
-        {sidebarLinks.map((link) => {
-          const Icon = link.icon
-          return (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
-                link.active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              <span>{link.label}</span>
-            </Link>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 // Address Card Component
 function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
@@ -176,18 +79,16 @@ function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`bg-white rounded-2xl border-2 overflow-hidden transition-all ${
-        address.isDefault ? "border-red-500 shadow-md" : "border-gray-100 shadow-sm hover:shadow-md"
-      }`}
+      className={`bg-white rounded-2xl border-2 overflow-hidden transition-all ${address.isDefault ? "border-red-500 shadow-md" : "border-gray-100 shadow-sm hover:shadow-md"
+        }`}
     >
       {/* Header */}
       <div className="p-5 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
-              className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                address.type === "work" ? "bg-blue-50" : "bg-amber-50"
-              }`}
+              className={`w-10 h-10 rounded-lg flex items-center justify-center ${address.type === "work" ? "bg-blue-50" : "bg-amber-50"
+                }`}
             >
               <TypeIcon size={20} className={address.type === "work" ? "text-blue-600" : "text-amber-600"} />
             </div>
@@ -223,16 +124,18 @@ function AddressCard({ address, onEdit, onDelete, onSetDefault }) {
       {/* Address Details */}
       <div className="p-5">
         <div className="space-y-1 text-sm">
-          <p className="font-semibold text-gray-900">{address.name}</p>
+          <p className="font-semibold text-gray-900">{address.fullName}</p>
           <p className="text-gray-600">{address.phone}</p>
           <p className="text-gray-600">
-            {address.address}
-            {address.apartment && `, ${address.apartment}`}
+            {address.addressLine1}
           </p>
+          {address.addressLine2 && (
+            <p className="text-gray-600">{address.addressLine2}</p>
+          )}
           <p className="text-gray-600">
-            {address.city}, {address.state} {address.zipCode}
+            {address.city}, {address.state} {address.pincode}
           </p>
-          <p className="text-gray-600">{address.country}</p>
+          <p className="text-gray-600">India</p>
         </div>
 
         {/* Set as Default Button */}
@@ -254,16 +157,52 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
   const [formData, setFormData] = useState({
     type: address?.type || "home",
     label: address?.label || "",
-    name: address?.name || "",
+    fullName: address?.fullName || "",
     phone: address?.phone || "",
-    address: address?.address || "",
-    apartment: address?.apartment || "",
+    addressLine1: address?.addressLine1 || "",
+    addressLine2: address?.addressLine2 || "",
     city: address?.city || "",
     state: address?.state || "",
-    zipCode: address?.zipCode || "",
-    country: address?.country || "United States",
+    pincode: address?.pincode || "",
+    country: address?.country || "India",
     isDefault: address?.isDefault || false,
   })
+
+  useEffect(() => {
+  if (!address) {
+    setFormData({
+      type: "home",
+      label: "",
+      fullName: "",
+      phone: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      pincode: "",
+      country: "India",
+      isDefault: false,
+    });
+  }
+}, [address]);
+
+  useEffect(() => {
+  if (address) {
+    setFormData({
+      type: address.type || "home",
+      label: address.label || "",
+      fullName: address.fullName || "",
+      phone: address.phone || "",
+      addressLine1: address.addressLine1 || "",
+      addressLine2: address.addressLine2 || "",
+      city: address.city || "",
+      state: address.state || "",
+      pincode: address.pincode || "",
+      country: address.country || "India",
+      isDefault: address.isDefault || false,
+    });
+  }
+}, [address]);
 
   const [errors, setErrors] = useState({})
 
@@ -273,12 +212,12 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
     // Basic validation
     const newErrors = {}
     if (!formData.label.trim()) newErrors.label = "Label is required"
-    if (!formData.name.trim()) newErrors.name = "Name is required"
+    if (!formData.fullName.trim()) newErrors.fullName = "Name is required"
     if (!formData.phone.trim()) newErrors.phone = "Phone is required"
-    if (!formData.address.trim()) newErrors.address = "Address is required"
+    if (!formData.addressLine1.trim()) newErrors.addressLine1 = "Address is required"
     if (!formData.city.trim()) newErrors.city = "City is required"
     if (!formData.state.trim()) newErrors.state = "State is required"
-    if (!formData.zipCode.trim()) newErrors.zipCode = "ZIP code is required"
+    if (!formData.pincode.trim()) newErrors.pincode = "ZIP code is required"
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -329,9 +268,8 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, type: "home" })}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${
-                    formData.type === "home" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${formData.type === "home" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   <Home size={18} />
                   Home
@@ -339,9 +277,8 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, type: "work" })}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${
-                    formData.type === "work" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all ${formData.type === "work" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   <Building2 size={18} />
                   Work
@@ -360,9 +297,8 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                   setErrors({ ...errors, label: "" })
                 }}
                 placeholder="e.g., Home, Office, Mom's House"
-                className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                  errors.label ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                }`}
+                className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.label ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                  }`}
               />
               {errors.label && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -378,20 +314,19 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Full Name</label>
                 <input
                   type="text"
-                  value={formData.name}
+                  value={formData.fullName}
                   onChange={(e) => {
-                    setFormData({ ...formData, name: e.target.value })
-                    setErrors({ ...errors, name: "" })
+                    setFormData({ ...formData, fullName: e.target.value })
+                    setErrors({ ...errors, fullName: "" })
                   }}
                   placeholder="John Doe"
-                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    errors.name ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                  }`}
+                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.fullName ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                    }`}
                 />
-                {errors.name && (
+                {errors.fullName && (
                   <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
                     <AlertCircle size={14} />
-                    {errors.name}
+                    {errors.fullName}
                   </p>
                 )}
               </div>
@@ -404,10 +339,9 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                     setFormData({ ...formData, phone: e.target.value })
                     setErrors({ ...errors, phone: "" })
                   }}
-                  placeholder="+1 (555) 123-4567"
-                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    errors.phone ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                  }`}
+                  placeholder="+91 9876543210"
+                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.phone ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                    }`}
                 />
                 {errors.phone && (
                   <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
@@ -423,20 +357,19 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
               <label className="block text-sm font-semibold text-gray-700 mb-2">Street Address</label>
               <input
                 type="text"
-                value={formData.address}
+                value={formData.addressLine1}
                 onChange={(e) => {
-                  setFormData({ ...formData, address: e.target.value })
-                  setErrors({ ...errors, address: "" })
+                  setFormData({ ...formData, addressLine1: e.target.value })
+                  setErrors({ ...errors, addressLine1: "" })
                 }}
                 placeholder="123 Main Street"
-                className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                  errors.address ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                }`}
+                className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.addressLine1 ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                  }`}
               />
-              {errors.address && (
+              {errors.addressLine1 && (
                 <p className="mt-1 text-sm text-red-600 flex items-center gap-1">
                   <AlertCircle size={14} />
-                  {errors.address}
+                  {errors.addressLine1}
                 </p>
               )}
             </div>
@@ -448,8 +381,8 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
               </label>
               <input
                 type="text"
-                value={formData.apartment}
-                onChange={(e) => setFormData({ ...formData, apartment: e.target.value })}
+                value={formData.addressLine2}
+                onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })}
                 placeholder="Apt 4B, Suite 200"
                 className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-red-500 focus:bg-white transition-all"
               />
@@ -466,10 +399,9 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                     setFormData({ ...formData, city: e.target.value })
                     setErrors({ ...errors, city: "" })
                   }}
-                  placeholder="Los Angeles"
-                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    errors.city ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                  }`}
+                  placeholder="Mumbai"
+                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.city ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                    }`}
                 />
               </div>
               <div>
@@ -481,25 +413,23 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                     setFormData({ ...formData, state: e.target.value })
                     setErrors({ ...errors, state: "" })
                   }}
-                  placeholder="CA"
-                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    errors.state ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                  }`}
+                  placeholder="Maharashtra"
+                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.state ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                    }`}
                 />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">ZIP Code</label>
                 <input
                   type="text"
-                  value={formData.zipCode}
+                  value={formData.pincode}
                   onChange={(e) => {
-                    setFormData({ ...formData, zipCode: e.target.value })
-                    setErrors({ ...errors, zipCode: "" })
+                    setFormData({ ...formData, pincode: e.target.value })
+                    setErrors({ ...errors, pincode: "" })
                   }}
-                  placeholder="90001"
-                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${
-                    errors.zipCode ? "border-red-500" : "border-gray-200 focus:border-red-500"
-                  }`}
+                  placeholder="400001"
+                  className={`w-full h-12 px-4 bg-gray-50 border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white transition-all ${errors.pincode ? "border-red-500" : "border-gray-200 focus:border-red-500"
+                    }`}
                 />
               </div>
             </div>
@@ -512,10 +442,7 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                 onChange={(e) => setFormData({ ...formData, country: e.target.value })}
                 className="w-full h-12 px-4 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:border-red-500 focus:bg-white transition-all"
               >
-                <option value="United States">United States</option>
-                <option value="Canada">Canada</option>
-                <option value="United Kingdom">United Kingdom</option>
-                <option value="Australia">Australia</option>
+                <option value="India">India</option>
               </select>
             </div>
 
@@ -529,9 +456,8 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
                   className="sr-only"
                 />
                 <div
-                  className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${
-                    formData.isDefault ? "bg-red-600 border-red-600" : "border-gray-300 group-hover:border-gray-400"
-                  }`}
+                  className={`w-5 h-5 rounded-md border-2 transition-all flex items-center justify-center ${formData.isDefault ? "bg-red-600 border-red-600" : "border-gray-300 group-hover:border-gray-400"
+                    }`}
                 >
                   {formData.isDefault && <Check size={14} className="text-white" />}
                 </div>
@@ -558,6 +484,7 @@ function AddressModal({ isOpen, onClose, address, onSave }) {
               {address ? "Save Changes" : "Add Address"}
             </motion.button>
           </div>
+
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -613,54 +540,59 @@ function DeleteModal({ isOpen, onClose, onConfirm, addressLabel }) {
 
 
 const AddressPage = () => {
-   const [addresses, setAddresses] = useState(initialAddresses)
+  const [addresses, setAddresses] = useState([])
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingAddress, setEditingAddress] = useState(null)
   const [deletingAddress, setDeletingAddress] = useState(null)
-  
+  const { user, updateProfile } = useAuthStore();
 
-  const handleSave = (addressData) => {
+  useEffect(() => {
+    if (user?.addresses) {
+      setAddresses(user.addresses)
+    }
+  }, [user])
+
+  const handleSave = async (addressData) => {
+    let updatedAddresses;
+
     if (editingAddress) {
-      // Edit existing
-      setAddresses((prev) =>
-        prev.map((addr) => {
-          if (addr.id === editingAddress.id) {
-            return { ...addressData, id: addr.id }
-          }
-          // If new address is default, remove default from others
-          if (addressData.isDefault && addr.id !== editingAddress.id) {
-            return { ...addr, isDefault: false }
-          }
-          return addr
-        }),
-      )
+      // edit existing
+      updatedAddresses = addresses.map((addr) =>
+        addr._id === editingAddress._id ? { ...addr, ...addressData } : addr
+      );
     } else {
-      // Add new
-      const newId = Math.max(...addresses.map((a) => a.id), 0) + 1
-      setAddresses((prev) => {
-        const updated = addressData.isDefault ? prev.map((addr) => ({ ...addr, isDefault: false })) : prev
-        return [...updated, { ...addressData, id: newId }]
-      })
+      // add new
+      updatedAddresses = [...addresses, addressData];
     }
-    setEditingAddress(null)
-    setShowAddModal(false)
-  }
 
-  const handleDelete = () => {
-    if (deletingAddress) {
-      setAddresses((prev) => prev.filter((addr) => addr.id !== deletingAddress.id))
-      setDeletingAddress(null)
+    const res = await updateProfile({ addresses: updatedAddresses });
+
+    if (res.success) {
+      setEditingAddress(null);
+      setShowAddModal(false);
     }
   }
 
-  const handleSetDefault = (id) => {
-    setAddresses((prev) =>
-      prev.map((addr) => ({
-        ...addr,
-        isDefault: addr.id === id,
-      })),
-    )
+  const handleDelete = async () => {
+    const updatedAddresses = addresses.filter(
+      (addr) => addr._id !== deletingAddress._id
+    );
+
+    const res = await updateProfile({ addresses: updatedAddresses });
+
+    if (res.success) {
+      setDeletingAddress(null);
+    }
   }
+
+  const handleSetDefault = async (_id) => {
+  const updatedAddresses = addresses.map((addr) => ({
+    ...addr,
+    isDefault: addr._id === _id,
+  }));
+
+  await updateProfile({ addresses: updatedAddresses });
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -698,14 +630,14 @@ const AddressPage = () => {
                 <AnimatePresence>
                   {addresses.map((address) => (
                     <AddressCard
-                      key={address.id}
+                      key={address._id}
                       address={address}
                       onEdit={() => {
                         setEditingAddress(address)
                         setShowAddModal(true)
                       }}
                       onDelete={() => setDeletingAddress(address)}
-                      onSetDefault={() => handleSetDefault(address.id)}
+                      onSetDefault={() => handleSetDefault(address._id)}
                     />
                   ))}
                 </AnimatePresence>

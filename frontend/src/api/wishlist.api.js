@@ -14,8 +14,8 @@ export const getWishlist = async () => {
  * body: { productId }
  * returns updated wishlist
  */
-export const toggleWishlist = async (payload) => {
-  const res = await api.post("/wishlist/toggle", payload);
+export const addWishlist = async (payload) => {
+  const res = await api.post("/wishlist/add", payload);
   return res.data;
 };
 

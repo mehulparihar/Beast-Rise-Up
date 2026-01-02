@@ -24,20 +24,21 @@ import PrivacyPolicyPage from "../pages/policies/PrivacyPolicyPage";
 import TermsPage from "../pages/policies/TermsPage";
 import ShippingPolicyPage from "../pages/policies/ShippingPolicyPage";
 import RefundPolicyPage from "../pages/policies/RefundPolicyPage";
+import NotFoundPage from "../pages/NotFoundPage";
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/category/:categoryName" element={<ProductsPage />} />
-      <Route path="/search" element={<SearchPage />} />
+      <Route path="/search/:searchParams" element={<SearchPage />} />
       <Route path="/product/:productId" element={<ProductDetailPage />} />
 
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgetpasswordPage />} />
-      <Route path="/reset-password" element={<ResetpasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetpasswordPage />} />
 
 
       <Route path="/checkout" element={<CheckoutPage />} />
@@ -60,6 +61,9 @@ export default function AppRoutes() {
       <Route path="/admin/customers" element={<CustomersManagement />} />
       <Route path="/admin/products" element={<ProductsManagement />} />
       <Route path="/admin/orders" element={<OrdersManagement />} />
+
+
+       <Route path="*" element={<NotFoundPage/>} />
 
     </Routes>
   );

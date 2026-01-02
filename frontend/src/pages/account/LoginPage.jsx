@@ -6,6 +6,8 @@ import { motion } from "framer-motion"
 import { Flame, Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, Check, AlertCircle } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import useAuthStore from "../../stores/useAuthStore"
+import { useGoogleLogin } from "@react-oauth/google";
+import axios from "axios"
 
 
 // Google Icon SVG Component
@@ -42,6 +44,7 @@ const LoginPage = () => {
   const [rememberMe, setRememberMe] = useState(false)
 
   const login = useAuthStore((state) => state.login);
+  const googleLogin = useAuthStore((state) => state.googleLogin);
   const authError = useAuthStore((state) => state.error);
   const loading = useAuthStore((state) => state.loading);
   const navigate = useNavigate();
@@ -67,18 +70,30 @@ const LoginPage = () => {
     }
   }
 
-  const handleGoogleLogin = async () => {
-    setError("")
-    setIsGoogleLoading(true)
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setError("");
+      setIsGoogleLoading(true);
+      const googleUser = await axios.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: {
+            Authorization: `Bearer ${tokenResponse.access_token}`,
+          },
+        }
+      );
 
-    // Simulate Google OAuth - replace with actual Google auth
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+      await googleLogin(googleUser.data);
+      navigate("/");
 
-    console.log("Google login initiated")
-    // Handle Google OAuth flow here
+      setIsGoogleLoading(false);
 
-    setIsGoogleLoading(false)
-  }
+    },
+    onError: () => {
+      setError("Google login failed");
+      setIsGoogleLoading(false);
+    },
+  });
 
   const containerVariants = {
     hidden: { opacity: 0 },

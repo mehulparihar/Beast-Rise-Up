@@ -15,9 +15,8 @@ import {
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react"
-import { Link } from "react-router-dom"
-
-
+import { Link, useParams } from "react-router-dom"
+import useAuthStore from "../../stores/useAuthStore"
 
 const ResetpasswordPage = () => {
   const [password, setPassword] = useState("")
@@ -27,6 +26,8 @@ const ResetpasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [isSuccess, setIsSuccess] = useState(false)
+  const resetPassword = useAuthStore((state) => state.resetPassword);
+  const { token } = useParams();
 
   // Password strength indicators
   const hasMinLength = password.length >= 8
@@ -60,11 +61,14 @@ const ResetpasswordPage = () => {
     setIsLoading(true)
 
     // Simulate API call - replace with actual reset logic
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    const res = await resetPassword(token, password);
 
+    if (!res.success) {
+      setError("Something went wrong");
+      setIsLoading(false);
+      return;
+    }
     setIsSuccess(true)
-    console.log("Password reset successful")
-
     setIsLoading(false)
   }
 
@@ -93,7 +97,7 @@ const ResetpasswordPage = () => {
 
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
+          <Link to="/" className="flex items-center gap-3">
             <div className="relative">
               <div className="w-12 h-12 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
                 <Flame className="text-red-500" size={24} />
@@ -162,7 +166,7 @@ const ResetpasswordPage = () => {
         <motion.div variants={containerVariants} initial="hidden" animate="visible" className="w-full max-w-md">
           {/* Mobile Logo */}
           <motion.div variants={itemVariants} className="lg:hidden mb-8">
-            <Link href="/" className="flex items-center gap-3 justify-center">
+            <Link to="/" className="flex items-center gap-3 justify-center">
               <div className="w-11 h-11 bg-gray-900 rounded-lg flex items-center justify-center">
                 <Flame className="text-red-500" size={22} />
               </div>
@@ -176,7 +180,7 @@ const ResetpasswordPage = () => {
           {/* Back Link */}
           <motion.div variants={itemVariants}>
             <Link
-              href="/login"
+              to="/login"
               className="inline-flex items-center gap-2 text-gray-500 hover:text-gray-900 text-sm font-medium transition-colors mb-8"
             >
               <ArrowLeft size={16} />
@@ -239,22 +243,20 @@ const ResetpasswordPage = () => {
                           {[1, 2, 3, 4, 5].map((level) => (
                             <div
                               key={level}
-                              className={`flex-1 h-full rounded-full transition-colors ${
-                                level <= passwordStrength ? getStrengthLabel().color : "bg-gray-200"
-                              }`}
+                              className={`flex-1 h-full rounded-full transition-colors ${level <= passwordStrength ? getStrengthLabel().color : "bg-gray-200"
+                                }`}
                             />
                           ))}
                         </div>
                         <span
-                          className={`text-xs font-semibold ${
-                            passwordStrength <= 2
+                          className={`text-xs font-semibold ${passwordStrength <= 2
                               ? "text-red-600"
                               : passwordStrength <= 3
                                 ? "text-yellow-600"
                                 : passwordStrength <= 4
                                   ? "text-blue-600"
                                   : "text-green-600"
-                          }`}
+                            }`}
                         >
                           {getStrengthLabel().label}
                         </span>
@@ -270,9 +272,8 @@ const ResetpasswordPage = () => {
                         ].map((req, idx) => (
                           <div key={idx} className="flex items-center gap-1.5">
                             <div
-                              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${
-                                req.check ? "bg-green-500" : "bg-gray-200"
-                              }`}
+                              className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${req.check ? "bg-green-500" : "bg-gray-200"
+                                }`}
                             >
                               {req.check && <Check size={10} className="text-white" />}
                             </div>
@@ -298,13 +299,12 @@ const ResetpasswordPage = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Confirm new password"
-                      className={`w-full h-13 pl-12 pr-12 py-4 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all ${
-                        confirmPassword && password !== confirmPassword
+                      className={`w-full h-13 pl-12 pr-12 py-4 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-4 transition-all ${confirmPassword && password !== confirmPassword
                           ? "border-red-300 focus:border-red-500 focus:ring-red-500/10"
                           : confirmPassword && password === confirmPassword
                             ? "border-green-300 focus:border-green-500 focus:ring-green-500/10"
                             : "border-gray-200 focus:border-red-500 focus:ring-red-500/10"
-                      }`}
+                        }`}
                       required
                     />
                     <Lock size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -360,7 +360,7 @@ const ResetpasswordPage = () => {
                 Your password has been successfully updated. You can now sign in with your new password.
               </p>
               <Link
-                href="/login"
+                to="/login"
                 className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors w-full"
               >
                 Continue to login
@@ -372,7 +372,7 @@ const ResetpasswordPage = () => {
           {/* Terms */}
           <motion.p variants={itemVariants} className="mt-8 text-center text-xs text-gray-400 leading-relaxed">
             Remember your password?{" "}
-            <Link href="/login" className="text-red-600 hover:text-red-700 font-semibold transition-colors">
+            <Link to="/login" className="text-red-600 hover:text-red-700 font-semibold transition-colors">
               Sign in
             </Link>
           </motion.p>

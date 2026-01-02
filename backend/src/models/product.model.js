@@ -32,6 +32,14 @@ const productSchema = new mongoose.Schema(
     variants: [variantSchema], // multiple variants possible
     tags: [String],
     defaultImage: String,
+    features: [String], // bullet points
+
+    details: {
+      material: String,
+      fit: String,
+      care: String,
+      origin: String,
+    },
     ratingAverage: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
     isFeatured: { type: Boolean, default: false },

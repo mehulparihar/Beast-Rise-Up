@@ -5,7 +5,7 @@
  * - Optimistic updates for add/update/remove
  */
 
-import create from "zustand";
+import {create} from "zustand";
 import { getCart, addToCart as apiAddToCart, updateCartItem as apiUpdateCartItem, removeFromCart as apiRemoveFromCart, clearCart as apiClearCart } from "../api/cart.api";
 
 const CART_KEY = "cart_v1";

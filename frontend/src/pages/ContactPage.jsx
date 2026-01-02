@@ -34,14 +34,14 @@ const faqs = [
     answer:
       "Once your order ships, you'll receive an email with tracking information. You can also track orders in your account dashboard.",
   },
-  {
-    question: "What is your return policy?",
-    answer:
-      "We offer a 30-day return policy for unworn items in original packaging. Refunds are processed within 5-7 business days.",
-  },
+  // {
+  //   question: "What is your return policy?",
+  //   answer:
+  //     "We offer a 30-day return policy for unworn items in original packaging. Refunds are processed within 5-7 business days.",
+  // },
   {
     question: "Do you ship internationally?",
-    answer: "Yes! We ship to over 50 countries worldwide. International shipping typically takes 10-15 business days.",
+    answer: "No, currently we only ship within India.",
   },
 ]
 
@@ -222,7 +222,7 @@ const ContactPage = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-0.5">Call Us</h3>
                     <a href="tel:+1234567890" className="text-gray-600">
-                      +1 (234) 567-890
+                      +91 98765 43210
                     </a>
                   </div>
                 </div>
@@ -234,9 +234,9 @@ const ContactPage = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-0.5">Visit Us</h3>
                     <p className="text-gray-600">
-                      123 Streetwear Avenue
+                      123 Street Name
                       <br />
-                      Los Angeles, CA 90001
+                      City, State, 12345
                     </p>
                   </div>
                 </div>

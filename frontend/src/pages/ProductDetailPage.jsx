@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ShoppingCart,
@@ -25,9 +25,13 @@ import {
   ChevronRight,
   Zap,
 } from "lucide-react"
-import { Link } from "react-router-dom"
+import { Link, useParams, useNavigate } from "react-router-dom"
 import Navbar from "../components/layout/Navbar"
 import Footer from "../components/layout/Footer"
+import useProductStore from "../stores/useProductStore"
+import Loading from "./Loading"
+import useCartStore from "../stores/useCartStore"
+import useWishlistStore from "../stores/useWishlistStore"
 
 // Product data
 const product = {
@@ -167,46 +171,118 @@ const sizeGuide = {
 
 const ProductDetailPage = () => {
   const [selectedSize, setSelectedSize] = useState("")
-  const [selectedColor, setSelectedColor] = useState(product.colors[0])
+  const [selectedColor, setSelectedColor] = useState(null)
   const [quantity, setQuantity] = useState(1)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [isFavorited, setIsFavorited] = useState(false)
   const [addedToCart, setAddedToCart] = useState(false)
   const [activeTab, setActiveTab] = useState("details")
   const [showSizeGuide, setShowSizeGuide] = useState(false)
-  
+  const { productId } = useParams();
+  const navigate = useNavigate();
+
+  const { list: products, loadProducts} = useProductStore();
+  const { addToCart } = useCartStore();
+  const { add, remove, wishlist } = useWishlistStore();
+
+  const product = products.find((p) => p._id === productId);
+
+  useEffect(() => {
+    if (!product && products.length === 0) {
+      loadProducts();
+    }
+  }, [product, products]);
+
+  console.log("ProductDetailPage product:", product);
+  const variant = product?.variants?.[0];
+useMemo
+  useEffect(() => {
+    if (variant?.colors?.length) {
+      setSelectedColor(variant.colors[0]);
+    }
+  }, [variant]);
+
+  const images = useMemo(() => {
+    if (selectedColor?.images?.length) return selectedColor.images;
+    if (product?.defaultImage) return [product.defaultImage];
+    return [];
+  }, [selectedColor, product]);
+
+  const price = variant?.discountedPrice ?? variant?.price ?? 0;
+  const originalPrice =
+    variant?.discountedPrice && variant?.price > variant?.discountedPrice
+      ? variant.price
+      : null;
+
+  const isInStock =
+    selectedSize &&
+    selectedColor &&
+    variant.stockBySizeColor.some(
+      (s) =>
+        s.size === selectedSize &&
+        s.colorName === selectedColor.name &&
+        s.stock > 0
+    );
+
+  const stockLeft =
+    selectedSize && selectedColor
+      ? variant.stockBySizeColor.find(
+          (s) =>
+            s.size === selectedSize &&
+            s.colorName === selectedColor.name
+        )?.stock
+      : null;
+
+  const relatedProducts = products
+    .filter(
+      (p) =>
+        p._id !== product._id &&
+        p.category === product.category
+    )
+    .slice(0, 4);
+
+
+
+
+
+
 
   const handleAddToCart = () => {
-    if (!selectedSize) return
+    if (!isInStock) return;
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
   }
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length)
+    setCurrentImageIndex((prev) => (prev + 1) % images.length)
   }
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + product.images.length) % product.images.length)
+    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
   }
+
+  if (!product) {
+    return <Loading />;
+  }
+
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar/>
+      <Navbar />
 
       {/* Breadcrumb */}
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <nav className="flex items-center gap-2 text-sm">
-            <Link href="/" className="text-gray-500 hover:text-red-600 transition-colors">
+            <Link to="/" className="text-gray-500 hover:text-red-600 transition-colors">
               Home
             </Link>
             <ChevronRight size={14} className="text-gray-400" />
-            <Link href="/products" className="text-gray-500 hover:text-red-600 transition-colors">
+            <Link to="/products" className="text-gray-500 hover:text-red-600 transition-colors">
               Products
             </Link>
             <ChevronRight size={14} className="text-gray-400" />
-            <Link href="/products?category=hoodies" className="text-gray-500 hover:text-red-600 transition-colors">
+            <Link to="/products?category=hoodies" className="text-gray-500 hover:text-red-600 transition-colors">
               {product.category}
             </Link>
             <ChevronRight size={14} className="text-gray-400" />
@@ -248,7 +324,7 @@ const ProductDetailPage = () => {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3 }}
-                  src={product.images[currentImageIndex] || "/placeholder.svg"}
+                  src={images[currentImageIndex] || "/placeholder.svg"}
                   alt={product.title}
                   className="w-full h-full object-cover"
                 />
@@ -270,19 +346,18 @@ const ProductDetailPage = () => {
 
               {/* Image Counter */}
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 text-white text-xs font-medium">
-                {currentImageIndex + 1} / {product.images.length}
+                {currentImageIndex + 1} / {images.length}
               </div>
             </motion.div>
 
             {/* Thumbnail Images */}
             <div className="flex gap-3">
-              {product.images.map((image, idx) => (
+              {images.map((image, idx) => (
                 <button
                   key={idx}
                   onClick={() => setCurrentImageIndex(idx)}
-                  className={`relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 transition-all ${
-                    currentImageIndex === idx ? "ring-2 ring-red-500 ring-offset-2" : "opacity-60 hover:opacity-100"
-                  }`}
+                  className={`relative w-20 h-20 rounded-lg overflow-hidden bg-gray-100 transition-all ${currentImageIndex === idx ? "ring-2 ring-red-500 ring-offset-2" : "opacity-60 hover:opacity-100"
+                    }`}
                 >
                   <img
                     src={image || "/placeholder.svg"}
@@ -300,7 +375,7 @@ const ProductDetailPage = () => {
               {/* Category & Rating */}
               <div className="flex items-center justify-between mb-3">
                 <Link
-                  href={`/products?category=${product.category.toLowerCase()}`}
+                  to={`/products?category=${product.category.toLowerCase()}`}
                   className="text-sm font-medium text-red-600 hover:text-red-700"
                 >
                   {product.category}
@@ -311,9 +386,8 @@ const ProductDetailPage = () => {
                       <Star
                         key={i}
                         size={16}
-                        className={`${
-                          i < Math.floor(product.rating) ? "fill-red-500 text-red-500" : "fill-gray-200 text-gray-200"
-                        }`}
+                        className={`${i < Math.floor(product.rating) ? "fill-red-500 text-red-500" : "fill-gray-200 text-gray-200"
+                          }`}
                       />
                     ))}
                   </div>
@@ -327,12 +401,12 @@ const ProductDetailPage = () => {
 
               {/* Price */}
               <div className="flex items-center gap-4 mb-6">
-                <span className="text-3xl font-black text-gray-900">${product.price.toFixed(2)}</span>
+                <span className="text-3xl font-black text-gray-900">₹{price.toFixed(2)}</span>
                 {product.originalPrice && (
                   <>
-                    <span className="text-xl text-gray-400 line-through">${product.originalPrice.toFixed(2)}</span>
+                    <span className="text-xl text-gray-400 line-through">₹{originalPrice.toFixed(2)}</span>
                     <span className="px-2 py-1 bg-red-100 text-red-600 text-sm font-bold rounded">
-                      Save ${(product.originalPrice - product.price).toFixed(2)}
+                      Save ₹{(originalPrice - price).toFixed(2)}
                     </span>
                   </>
                 )}
@@ -345,19 +419,18 @@ const ProductDetailPage = () => {
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-bold text-gray-900">
-                    Color: <span className="font-normal text-gray-600">{selectedColor.name}</span>
+                    Color: <span className="font-normal text-gray-600">{selectedColor?.name}</span>
                   </span>
                 </div>
                 <div className="flex gap-3">
-                  {product.colors.map((color) => (
+                  {variant.colors.map((color) => (
                     <button
                       key={color.name}
                       onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-full transition-all ${
-                        selectedColor.name === color.name
-                          ? "ring-2 ring-red-500 ring-offset-2"
-                          : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
-                      }`}
+                      className={`w-10 h-10 rounded-full transition-all ${selectedColor?.name === color.name
+                        ? "ring-2 ring-red-500 ring-offset-2"
+                        : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
+                        }`}
                       style={{ backgroundColor: color.hex }}
                       title={color.name}
                     />
@@ -378,15 +451,14 @@ const ProductDetailPage = () => {
                   </button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {product.sizes.map((size) => (
+                  {variant.sizes.map((size) => (
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                      className={`min-w-[50px] h-12 px-4 rounded-lg font-bold transition-all ${
-                        selectedSize === size
-                          ? "bg-gray-900 text-white"
-                          : "bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-900"
-                      }`}
+                      className={`min-w-[50px] h-12 px-4 rounded-lg font-bold transition-all ${selectedSize === size
+                        ? "bg-gray-900 text-white"
+                        : "bg-white border-2 border-gray-200 text-gray-700 hover:border-gray-900"
+                        }`}
                     >
                       {size}
                     </button>
@@ -417,7 +489,7 @@ const ProductDetailPage = () => {
                     </motion.button>
                   </div>
                   <span className="text-sm text-gray-500">
-                    Total: <span className="font-bold text-gray-900">${(product.price * quantity).toFixed(2)}</span>
+                    Total: <span className="font-bold text-gray-900">₹{(price * quantity).toFixed(2)}</span>
                   </span>
                 </div>
               </div>
@@ -429,13 +501,12 @@ const ProductDetailPage = () => {
                   whileTap={{ scale: 0.99 }}
                   onClick={handleAddToCart}
                   disabled={!selectedSize}
-                  className={`flex-1 flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg ${
-                    addedToCart
-                      ? "bg-green-600 text-white"
-                      : selectedSize
-                        ? "bg-red-600 text-white hover:bg-red-700 shadow-red-600/20"
-                        : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-2 px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-lg ${addedToCart
+                    ? "bg-green-600 text-white"
+                    : selectedSize
+                      ? "bg-red-600 text-white hover:bg-red-700 shadow-red-600/20"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    }`}
                 >
                   {addedToCart ? (
                     <>
@@ -453,11 +524,10 @@ const ProductDetailPage = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsFavorited(!isFavorited)}
-                  className={`w-14 h-14 flex items-center justify-center rounded-xl border-2 transition-all ${
-                    isFavorited
-                      ? "bg-red-50 border-red-500 text-red-600"
-                      : "border-gray-200 text-gray-500 hover:border-red-500 hover:text-red-600"
-                  }`}
+                  className={`w-14 h-14 flex items-center justify-center rounded-xl border-2 transition-all ${isFavorited
+                    ? "bg-red-50 border-red-500 text-red-600"
+                    : "border-gray-200 text-gray-500 hover:border-red-500 hover:text-red-600"
+                    }`}
                 >
                   <Heart size={22} className={isFavorited ? "fill-red-600" : ""} />
                 </motion.button>
@@ -528,9 +598,8 @@ const ProductDetailPage = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-4 text-sm font-bold transition-colors relative ${
-                  activeTab === tab.id ? "text-gray-900" : "text-gray-500 hover:text-gray-700"
-                }`}
+                className={`px-6 py-4 text-sm font-bold transition-colors relative ${activeTab === tab.id ? "text-gray-900" : "text-gray-500 hover:text-gray-700"
+                  }`}
               >
                 {tab.label}
                 {activeTab === tab.id && (
@@ -554,7 +623,7 @@ const ProductDetailPage = () => {
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 mb-4">Features</h3>
                     <ul className="space-y-3">
-                      {product.features.map((feature, idx) => (
+                      {product.features?.map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-3">
                           <Check size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
                           <span className="text-gray-600">{feature}</span>
@@ -565,12 +634,12 @@ const ProductDetailPage = () => {
                   <div>
                     <h3 className="text-lg font-bold text-gray-900 mb-4">Product Details</h3>
                     <div className="space-y-3">
-                      {Object.entries(product.details).map(([key, value]) => (
+                      {/* {Object.entries(product?.details).map(([key, value]) => (
                         <div key={key} className="flex justify-between py-2 border-b border-gray-100">
                           <span className="text-gray-500 capitalize">{key}</span>
                           <span className="text-gray-900 font-medium">{value}</span>
                         </div>
-                      ))}
+                      ))} */}
                     </div>
                   </div>
                 </motion.div>
@@ -732,7 +801,7 @@ const ProductDetailPage = () => {
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl md:text-3xl font-black text-gray-900">You May Also Like</h2>
             <Link
-              href="/products"
+              to="/category/all"
               className="flex items-center gap-2 text-red-600 font-semibold hover:gap-3 transition-all"
             >
               View All <ArrowRight size={18} />
@@ -749,7 +818,7 @@ const ProductDetailPage = () => {
                 whileHover={{ y: -4 }}
                 className="group"
               >
-                <Link href={`/product/${item.id}`}>
+                <Link to={`/product/${item._id}`}>
                   <div className="relative mb-3 rounded-xl overflow-hidden bg-gray-100 aspect-[3/4] shadow-sm">
                     {item.badge && (
                       <div className="absolute top-3 left-3 z-10">

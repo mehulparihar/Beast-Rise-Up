@@ -56,6 +56,16 @@ export const getProfile = async () => {
   return res.data;
 };
 
+export const changePassword = async (payload) => {
+  const res = await api.put("/auth/change-password", payload);
+  return res.data;
+};
+
+export const updateProfile = async (payload) => {
+  const res = await api.put("/auth/profile", payload);
+  return res.data;
+};
+
 /**
  * POST /auth/forgot-password
  * body: { email }
@@ -71,5 +81,35 @@ export const forgotPassword = async (payload) => {
  */
 export const resetPassword = async (token, payload) => {
   const res = await api.post(`/auth/reset-password/${token}`, payload);
+  return res.data;
+};
+
+export const googleAuth = async (payload) => {
+  try {
+    const res = await api.post("/auth/google", payload, { withCredentials: true });
+    return res.data;
+  } catch (error) {
+    console.error("Google auth error:", error);
+    throw error;
+  }
+};
+
+/**
+ * POST /auth/send-otp
+ * body: { email }
+ * response: { message: "OTP sent" }
+ */
+export const sendOtp = async (payload) => {
+  const res = await api.post("/auth/send-otp", payload);
+  return res.data;
+};
+
+/**
+ * POST /auth/verify-otp
+ * body: { name, email, password, otp }
+ * response: { accessToken, refreshToken, user }
+ */
+export const verifyOtp = async (payload) => {
+  const res = await api.post("/auth/verify-otp", payload);
   return res.data;
 };

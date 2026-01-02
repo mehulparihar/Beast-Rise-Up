@@ -4,8 +4,8 @@
  * - pagination & filters state
  */
 
-import create from "zustand";
-import { fetchProducts, fetchProductById, fetchFeatured, fetchByCategory } from "../api/product.api";
+import { create } from "zustand";
+import { fetchProducts, fetchProductById, fetchFeatured, fetchByCategory, searchProducts } from "../api/product.api";
 
 const useProductStore = create((set, get) => ({
   list: [],              // current product list
@@ -20,7 +20,11 @@ const useProductStore = create((set, get) => ({
 
   setLoading: (v) => set({ loading: v }),
   setError: (err) => set({ error: err }),
-  setFilters: (filters) => set({ filters }),
+  setFilters: (newFilters) =>
+    set((state) => ({
+      filters: { ...state.filters, ...newFilters },
+    })),
+
   setPage: (p) => set({ page: p }),
 
   // fetch product list with current filters + pagination
@@ -97,6 +101,27 @@ const useProductStore = create((set, get) => ({
       console.error("Load by category error:", err);
       set({ loading: false, error: err?.message });
       return { success: false, message: err?.message };
+    }
+  },
+  search: async (query, opts = {}) => {
+    set({ loading: true, error: null, searchQuery: query });
+
+    try {
+      const res = await searchProducts(query, {
+        page: get().page,
+        limit: get().limit,
+        ...opts,
+      });
+
+      const products = res.products || res.data || [];
+      const total = res.total || res.count || products.length;
+
+      set({ list: products, total, loading: false });
+
+      return { success: true, products };
+    } catch (err) {
+      set({ loading: false, error: err?.message });
+      return { success: false };
     }
   },
 }));

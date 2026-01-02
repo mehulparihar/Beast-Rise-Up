@@ -23,28 +23,13 @@ import { useEffect } from "react"
 import { Link } from "react-router-dom"
 import Navbar from "../../components/layout/Navbar"
 import Footer from "../../components/layout/Footer"
+import useAuthStore from "../../stores/useAuthStore"
+import Loading from "../Loading"
+import AccountSidebar from "../../components/profie/AccountSidebar"
+import MobileAccountNav from "../../components/profie/MobileAccountNav"
+import StatusBadge from "../../components/profie/StatusBadge"
 
 
-// Sidebar navigation items
-const sidebarLinks = [
-  { label: "Dashboard", href: "/account", icon: User, active: true },
-  { label: "My Orders", href: "/account/orders", icon: Package },
-  { label: "Wishlist", href: "/account/wishlist", icon: Heart },
-  { label: "Addresses", href: "/account/addresses", icon: MapPin },
-  { label: "Gift Vouchers", href: "/account/gift-vouchers", icon: Gift },
-  { label: "Payment Methods", href: "/account/payment", icon: CreditCard },
-  { label: "Settings", href: "/account/settings", icon: Settings },
-]
-
-// Mock user data
-const userData = {
-  name: "Marcus Johnson",
-  email: "marcus.johnson@example.com",
-  avatar: "/male-fitness-avatar.jpg",
-  memberSince: "January 2024",
-  loyaltyPoints: 2450,
-  tier: "Gold Member",
-}
 
 // Recent orders mock data
 const recentOrders = [
@@ -74,131 +59,53 @@ const recentOrders = [
   },
 ]
 
-// Quick stats
-const quickStats = [
-  { label: "Total Orders", value: "12", icon: ShoppingBag, color: "bg-blue-50 text-blue-600" },
-  { label: "In Transit", value: "1", icon: Truck, color: "bg-amber-50 text-amber-600" },
-  { label: "Wishlist Items", value: "8", icon: Heart, color: "bg-red-50 text-red-600" },
-  { label: "Reviews Given", value: "5", icon: Star, color: "bg-green-50 text-green-600" },
-]
-
-// Status badge component
-function StatusBadge({ status }) {
-  const styles = {
-    Delivered: "bg-green-100 text-green-700",
-    "In Transit": "bg-blue-100 text-blue-700",
-    Processing: "bg-amber-100 text-amber-700",
-    Cancelled: "bg-red-100 text-red-700",
-  }
-
-  return (
-    <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${styles[status] || "bg-gray-100 text-gray-700"}`}>
-      {status}
-    </span>
-  )
-}
-
-// Account Sidebar Component
-function AccountSidebar() {
-  return (
-    <aside className="hidden lg:block w-64 flex-shrink-0">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden sticky top-24">
-        {/* User Profile Card */}
-        <div className="p-6 bg-gradient-to-br from-gray-900 to-gray-800 text-white">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="relative">
-              <img
-                src={userData.avatar || "/placeholder.svg"}
-                alt={userData.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-white/20"
-              />
-              <button className="absolute -bottom-1 -right-1 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-colors">
-                <Camera size={12} className="text-white" />
-              </button>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg">{userData.name}</h3>
-              <p className="text-gray-400 text-sm">{userData.tier}</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-between p-3 bg-white/10 rounded-lg">
-            <div>
-              <p className="text-xs text-gray-400">Loyalty Points</p>
-              <p className="font-bold text-lg">{userData.loyaltyPoints.toLocaleString()}</p>
-            </div>
-            <Gift size={24} className="text-red-400" />
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="p-3">
-          {sidebarLinks.map((link) => {
-            const Icon = link.icon
-            return (
-              <Link
-                key={link.label}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${
-                  link.active ? "bg-red-50 text-red-600" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <Icon size={20} />
-                <span>{link.label}</span>
-                {link.active && <ChevronRight size={16} className="ml-auto" />}
-              </Link>
-            )
-          })}
-        </nav>
-
-        {/* Logout Button */}
-        <div className="p-3 border-t border-gray-100">
-          <button className="flex items-center gap-3 px-4 py-3 w-full rounded-xl font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">
-            <LogOut size={20} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-// Mobile Account Navigation
-function MobileAccountNav() {
-  return (
-    <div className="lg:hidden mb-6 overflow-x-auto pb-2">
-      <div className="flex gap-2 min-w-max">
-        {sidebarLinks.map((link) => {
-          const Icon = link.icon
-          return (
-            <Link
-              key={link.label}
-              href={link.href}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-full font-medium text-sm whitespace-nowrap transition-all ${
-                link.active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
-            >
-              <Icon size={16} />
-              <span>{link.label}</span>
-            </Link>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
 
 const ProfilePage = () => {
-  
+  const { user, fetchProfile, loading } = useAuthStore();
+
+  useEffect(() => {
+  if (!user && !loading) {
+    fetchProfile();
+    console.log("User data in ProfilePage:", user);
+  }
+}, [user, loading]);
+
+  const quickStats = [
+  { label: "Total Orders", value: user?.orders?.length || 0, icon: ShoppingBag, color: "bg-blue-50 text-blue-600" },
+  { label: "In Transit", value: user?.orders?.filter(order => order.status === "in-transit").length || 0, icon: Truck, color: "bg-amber-50 text-amber-600" },
+  { label: "Wishlist Items", value: user?.wishlist?.length || 0, icon: Heart, color: "bg-red-50 text-red-600" },
+  { label: "Reviews Given", value: user?.reviews?.length || 0, icon: Star, color: "bg-green-50 text-green-600" },
+]
+
+
+
+  const userData = {
+    name: user?.name,
+    email: user?.email,
+    avatar: user?.avatar || "/placeholder.svg",
+    memberSince: new Date(user?.createdAt).toLocaleString("en-US", {
+      month: "long",
+      year: "numeric",
+    }),
+    loyaltyPoints: user?.loyaltyPoints || 0,
+    tier: user?.tier || "Member",
+  };
+
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
   }
-
+  
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
   }
+
+  if (loading || !user) {
+    return <Loading />;
+  }
+  
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -229,7 +136,7 @@ const ProfilePage = () => {
                     </p>
                   </div>
                   <Link
-                    href="/account/settings"
+                    to="/account/settings"
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-lg hover:bg-gray-200 transition-colors text-sm"
                   >
                     <Edit2 size={16} />
@@ -268,7 +175,7 @@ const ProfilePage = () => {
                     <p className="text-sm text-gray-500">Track and manage your orders</p>
                   </div>
                   <Link
-                    href="/account/orders"
+                    to="/account/orders"
                     className="text-sm font-semibold text-red-600 hover:text-red-700 transition-colors flex items-center gap-1"
                   >
                     View All
@@ -277,29 +184,29 @@ const ProfilePage = () => {
                 </div>
 
                 <div className="divide-y divide-gray-100">
-                  {recentOrders.map((order) => (
-                    <div key={order.id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
+                  {user?.orders?.slice(0, 3).map(order => (
+                    <div key={order._id} className="p-4 sm:p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                           <img
-                            src={order.image || "/placeholder.svg"}
+                            src={order.items[0]?.product?.images?.[0] || "/placeholder.svg"}
                             alt={`Order ${order.id}`}
                             className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h3 className="font-bold text-gray-900">{order.id}</h3>
+                            <h3 className="font-bold text-gray-900">#{order._id}</h3>
                             <StatusBadge status={order.status} />
                           </div>
                           <p className="text-sm text-gray-500">
-                            {order.date} · {order.items} item{order.items > 1 ? "s" : ""}
+                            {new Date(order.createdAt).toLocaleDateString()} · {order.items.length} items
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-bold text-gray-900">${order.total.toFixed(2)}</p>
+                          <p className="font-bold text-gray-900">₹{order.totalAmount?.toFixed(2)}</p>
                           <Link
-                            href={`/account/orders/${order.id}`}
+                            to={`/account/orders/${order._id}`}
                             className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors"
                           >
                             View Details
@@ -314,7 +221,7 @@ const ProfilePage = () => {
               {/* Quick Actions */}
               <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Link
-                  href="/account/wishlist"
+                  to="/account/wishlist"
                   className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all group"
                 >
                   <div className="flex items-center gap-4">
@@ -323,7 +230,7 @@ const ProfilePage = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900">My Wishlist</h3>
-                      <p className="text-sm text-gray-500">8 items saved</p>
+                      <p className="text-sm text-gray-500">{user?.wishlist?.length || 0} items saved</p>
                     </div>
                     <ChevronRight
                       size={20}
@@ -333,7 +240,7 @@ const ProfilePage = () => {
                 </Link>
 
                 <Link
-                  href="/account/addresses"
+                  to="/account/addresses"
                   className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all group"
                 >
                   <div className="flex items-center gap-4">
@@ -342,7 +249,7 @@ const ProfilePage = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900">Addresses</h3>
-                      <p className="text-sm text-gray-500">2 saved addresses</p>
+                      <p className="text-sm text-gray-500">{user?.addresses?.length || 0} saved addresses</p>
                     </div>
                     <ChevronRight
                       size={20}
@@ -352,7 +259,7 @@ const ProfilePage = () => {
                 </Link>
 
                 <Link
-                  href="/account/gift-vouchers"
+                  to="/account/gift-vouchers"
                   className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all group"
                 >
                   <div className="flex items-center gap-4">
@@ -361,7 +268,7 @@ const ProfilePage = () => {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900">Gift Vouchers</h3>
-                      <p className="text-sm text-gray-500">$50.00 available</p>
+                      <p className="text-sm text-gray-500">₹50.00 available</p>
                     </div>
                     <ChevronRight
                       size={20}
@@ -386,7 +293,7 @@ const ProfilePage = () => {
                       Enable two-factor authentication for extra security on your account.
                     </p>
                     <Link
-                      href="/account/settings"
+                      to="/account/settings"
                       className="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-900 font-semibold rounded-lg hover:bg-gray-100 transition-colors text-sm"
                     >
                       Enable 2FA
