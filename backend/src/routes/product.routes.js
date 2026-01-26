@@ -13,10 +13,10 @@ router.get("/category/:category", getProductsByCategory);
 router.get("/recommendations", getRecommendedProducts);
 router.get("/:id", getProductById);
 
-router.patch("/:id", protectRoute, adminRoute, toggleFeaturedProduct);
-router.post("/", protectRoute, adminRoute, upload.array("images", 20), createProduct); 
-router.put("/:id", protectRoute, adminRoute, upload.array("images", 20), updateProduct);
-router.delete("/:id", protectRoute, adminRoute, deleteProduct);
+router.patch("/admin/:id", protectRoute, adminRoute, toggleFeaturedProduct);
+router.post("/admin/", protectRoute, adminRoute, upload.any(), createProduct); 
+router.put("/admin/:id", protectRoute, adminRoute, upload.array("images", 20), updateProduct);
+router.delete("/admin/:id", protectRoute, adminRoute, deleteProduct);
 
 
 export default router;

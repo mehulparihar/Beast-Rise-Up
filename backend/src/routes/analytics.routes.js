@@ -6,4 +6,6 @@ const router = express.Router();
 
 router.get("/", protectRoute, adminRoute, getDashboardAnalytics);
 
+
+
 export default router;

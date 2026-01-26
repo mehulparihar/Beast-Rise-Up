@@ -74,14 +74,14 @@ const OrderFailedPage = () => {
                         className="space-y-3"
                     >
                         <Link
-                            href="/checkout"
+                            to="/checkout"
                             className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-foreground text-background font-bold rounded-xl hover:bg-foreground/90 transition-colors"
                         >
                             <RefreshCcw size={18} />
                             Try Again
                         </Link>
                         <Link
-                            href="/"
+                            to="/"
                             className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-secondary text-foreground font-semibold rounded-xl hover:bg-secondary/80 transition-colors"
                         >
                             <ArrowLeft size={18} />

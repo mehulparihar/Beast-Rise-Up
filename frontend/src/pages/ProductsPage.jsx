@@ -51,7 +51,7 @@ const types = [
   "Bags",
 ]
 const priceRanges = [
-   { value: "all", label: "All Prices" },
+  { value: "all", label: "All Prices" },
   { value: "0-50", label: "Under ₹50" },
   { value: "50-100", label: "₹50 - ₹100" },
   { value: "100-200", label: "₹100 - ₹200" },
@@ -282,6 +282,24 @@ const ProductsPage = () => {
     "Sports Bras": "sports-bras",
     Hats: "hats",
     Bags: "bags",
+  };
+
+  const getDefaultSelection = (product) => {
+    const variant = product?.variants?.[0];
+    if (!variant) return null;
+
+    const size = variant?.sizes?.[0];
+    const color = variant?.colors?.[0];
+
+    if (!size || !color) return null;
+
+    return {
+      product,
+      productId: product._id,
+      sku: variant.sku,
+      size,
+      colorName: color.name,
+    };
   };
 
 
@@ -675,7 +693,15 @@ const ProductsPage = () => {
                       rating={product.ratingAverage}
                       reviews={product.ratingCount}
                       viewMode="grid"
-                      onAddToCart={(product, qty) => addToCart(product, qty)}
+                      onAddToCart={(product, qty = 1) => {
+                        const selection = getDefaultSelection(product);
+                        if (!selection) return;
+
+                        addToCart({
+                          ...selection,
+                          quantity: qty,
+                        });
+                      }}
                       isWishlisted={wishlist.includes(product._id)}
                       onToggleWishlist={(id) =>
                         wishlist.includes(id) ? remove(id) : add(id)
@@ -697,7 +723,16 @@ const ProductsPage = () => {
                       rating={product.ratingAverage}
                       reviews={product.ratingCount}
                       viewMode="list"
-                      onAddToCart={(product, qty) => addToCart(product, qty)}
+                      onAddToCart={(product, qty = 1) => {
+                        const selection = getDefaultSelection(product);
+                        if (!selection) return;
+
+                        addToCart({
+                          ...selection,
+                          quantity: qty,
+                        });
+                      }}
+
                       isWishlisted={wishlist.includes(product._id)}
                       onToggleWishlist={(id) =>
                         wishlist.includes(id) ? remove(id) : add(id)

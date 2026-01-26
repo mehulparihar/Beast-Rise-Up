@@ -1,5 +1,6 @@
 import redis from "../config/redis.js";
 import Product from "../models/product.model.js";
+import { uploadBufferToCloudinary } from "../services/cloudinaryService.js";
 
 export const getAllProducts = async (req, res) => {
     try {
@@ -101,64 +102,72 @@ export const toggleFeaturedProduct = async (req, res) => {
 };
 
 export const createProduct = async (req, res) => {
-    try {
-        const payload = req.body;
-        // if (!payloadRaw) return res.status(400).json({ message: "Missing payload field (JSON)" });
+  
+  try {
+    const payload = req.body
 
+    // 🔥 PARSE JSON FIELDS
+    payload.variants = payload.variants ? JSON.parse(payload.variants) : []
+    payload.tags = payload.tags ? JSON.parse(payload.tags) : []
+    payload.features = payload.features ? JSON.parse(payload.features) : []
 
-        // let payload;
-        // try {
-        //     payload = JSON.parse(payloadRaw);
-        // } catch (err) {
-        //     return res.status(400).json({ message: "Invalid JSON in payload" });
-        // }
-        if (!payload.slug) payload.slug = slugify(payload.title || Date.now().toString(), { lower: true, strict: true });
-
-        // Upload files
-        const fileMap = await uploadFiles(req.files || [], `products/${payload.slug}`);
-
-
-        // Attach uploaded urls/public_ids to payload variants/colors according to imageFields mapping
-        if (Array.isArray(payload.variants)) {
-            for (let vi = 0; vi < payload.variants.length; vi++) {
-                const variant = payload.variants[vi];
-                if (Array.isArray(variant.colors)) {
-                    for (let ci = 0; ci < variant.colors.length; ci++) {
-                        const color = variant.colors[ci];
-                        const imageFields = color.imageFields || [];
-                        const imgs = [];
-                        for (const f of imageFields) {
-                            if (fileMap[f]) imgs.push(fileMap[f]);
-                        }
-                        color.images = imgs;
-                        delete color.imageFields;
-                    }
-                }
-                // compute denorms
-                const agg = computeVariantAgg(variant);
-                variant.minPrice = agg.minPrice;
-                variant.maxPrice = agg.maxPrice;
-                variant.totalStock = agg.totalStock || 0;
-            }
-        }
-
-        // defaultImage: optional
-        if (!payload.defaultImage) {
-            const first = payload.variants && payload.variants[0];
-            if (first && first.colors && first.colors[0] && first.colors[0].images && first.colors[0].images[0]) {
-                payload.defaultImage = first.colors[0].images[0];
-            }
-        }
-
-        payload.createdBy = req.user ? req.user._id : undefined;
-
-        const created = await Product.create(payload);
-        res.status(201).json(created);
-    } catch (error) {
-        console.log("Error in createProduct controller", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
+    if (!payload.slug) {
+      payload.slug = slugify(
+        payload.title || Date.now().toString(),
+        { lower: true, strict: true }
+      )
     }
-};
+
+    // Upload files to Cloudinary
+    const fileMap = await uploadFiles(
+      req.files || [],
+      `products/${payload.slug}`
+    )
+
+    // Map uploaded images to variants/colors
+    if (Array.isArray(payload.variants)) {
+      for (const variant of payload.variants) {
+        if (Array.isArray(variant.colors)) {
+          for (const color of variant.colors) {
+            const imgs = []
+
+            for (const field of color.imageFields || []) {
+              if (fileMap[field]) imgs.push(fileMap[field])
+            }
+
+            color.images = imgs
+            delete color.imageFields
+          }
+        }
+
+        const agg = computeVariantAgg(variant)
+        variant.minPrice = agg.minPrice
+        variant.maxPrice = agg.maxPrice
+        variant.totalStock = agg.totalStock || 0
+      }
+    }
+
+    // Default image fallback
+    if (!payload.defaultImage) {
+      const firstImg =
+        payload.variants?.[0]?.colors?.[0]?.images?.[0]
+      if (firstImg) payload.defaultImage = firstImg
+    }
+
+    payload.createdBy = req.user?._id
+
+    const created = await Product.create(payload)
+    res.status(201).json(created)
+
+  } catch (error) {
+    console.error("Error in createProduct controller:", error)
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    })
+  }
+}
+
 
 export const updateProduct = async (req, res) => {
     try {

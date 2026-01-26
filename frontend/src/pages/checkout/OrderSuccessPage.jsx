@@ -102,14 +102,14 @@ const OrderSuccessPage = () => {
             className="space-y-3"
           >
             <Link
-              href="/"
+              to="/"
               className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 transition-colors"
             >
               Continue Shopping
               <ArrowRight size={18} />
             </Link>
             <Link
-              href="/orders"
+              to="/orders"
               className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gray-100 text-gray-900 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
             >
               Track Your Order

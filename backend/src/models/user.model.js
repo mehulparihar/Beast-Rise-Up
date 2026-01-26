@@ -72,6 +72,49 @@ const addressSchema = new mongoose.Schema({
         _id: true,
     });
 
+
+const cartItemSchema = new mongoose.Schema(
+    {
+        product: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            required: true,
+        },
+
+        quantity: {
+            type: Number,
+            default: 1,
+            min: 1,
+        },
+
+        // snapshot of product at time of add-to-cart
+        productSnapshot: {
+            title: String,
+            slug: String,
+            defaultImage: String,
+            brand: String,
+            category: String,
+
+            variant: {
+                sku: String,
+                price: Number,
+                discountedPrice: Number,
+            },
+
+            size: String,
+
+            color: {
+                name: String,
+                hexCode: String,
+            },
+        },
+    },
+    {
+        _id: false,
+    }
+);
+
+
 const userSchema = new mongoose.Schema(
     {
         name: {
@@ -112,18 +155,7 @@ const userSchema = new mongoose.Schema(
         },
 
         addresses: [addressSchema],
-        cartItems: [
-            {
-                quantity: {
-                    type: Number,
-                    default: 1,
-                },
-                product: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    ref: "Product",
-                },
-            },
-        ],
+        cartItems: [cartItemSchema],
         wishlist: [
             {
                 type: mongoose.Schema.Types.ObjectId,

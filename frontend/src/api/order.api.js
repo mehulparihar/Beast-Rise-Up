@@ -39,6 +39,7 @@ export const adminGetAllOrders = async () => {
  * body: { orderStatus, paymentStatus }
  */
 export const updateOrderStatus = async (id, payload) => {
-  const res = await api.patch(`/orders/${id}/status`, payload);
+  console.log("API: updateOrderStatus called");
+  const res = await api.patch(`/orders/admin/${id}`, payload);
   return res.data;
 };

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard,
@@ -22,18 +22,23 @@ import {
   DollarSign,
   Pencil,
   Trash2,
+  IndianRupee,
   Plus,
   X,
   ChevronDown,
 } from "lucide-react"
 import { Link } from "react-router-dom"
+import { analytics } from "../../api/analytics.api"
+import useAuthStore from "../../stores/useAuthStore"
+import api from "../../api/axios"
+import { deleteCustomer, getAllCustomers, getCustomersOrderAgg, updateCustomer } from "../../api/auth.api"
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Products", href: "/admin/products", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
   { name: "Customers", href: "/admin/customers", icon: Users, active: true },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
+  // { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 // interface CustomerOrder {
@@ -201,7 +206,7 @@ const initialCustomers = [
 
 const CustomersManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [customers, setCustomers] = useState(initialCustomers)
+  const [customers, setCustomers] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedCustomer, setSelectedCustomer] = useState(null)
@@ -213,8 +218,9 @@ const CustomersManagement = () => {
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
   const [formStatusDropdownOpen, setFormStatusDropdownOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("details")
+  const [loading, setLoading] = useState(true)
   const itemsPerPage = 5
-
+  const { user, fetchProfile } = useAuthStore()
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -226,11 +232,112 @@ const CustomersManagement = () => {
     zip: "",
     country: "United States",
   })
+  const { signup } = useAuthStore();
+
+  // normalize backend user -> UI shape
+  const normalize = (u, ordersAggMap = {}) => {
+    const stats = ordersAggMap[u._id] || { totalOrders: 0, totalSpent: 0 }
+    const defaultAddr = (u.addresses || []).find(a => a.isDefault) || u.addresses?.[0] || null
+
+    return {
+      id: u._id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone || "-",
+      status: stats.totalSpent >= 5000 ? "VIP" : stats.totalOrders > 0 ? "Active" : "Inactive",
+      avatar: u.avatar || "",
+      address: {
+        street: defaultAddr?.addressLine1 || "-",
+        city: defaultAddr?.city || "-",
+        state: defaultAddr?.state || "-",
+        zip: defaultAddr?.pincode || "-",
+        country: defaultAddr?.country || "India",
+      },
+      totalOrders: stats.totalOrders,
+      totalSpent: stats.totalSpent,
+      joinedAt: u.createdAt,
+      orders: [], // will be filled when fetching details
+    }
+  }
+
+  // const fetchCustomers = async () => {
+  //   try {
+  //     setLoading(true)
+  //     // 1) get users (customer list)
+  //     const usersRes = await api.get("auth/admin/customers") // backend: returns array of users
+  //     const users = usersRes.data.customers || usersRes.data || []
+
+  //     // 2) aggregate orders stats for these users (server may already return totals; if not, fetch)
+  //     // try to use endpoint that already returns totals; if not, fallback to server-side aggregation
+  //     // Here we assume API returns totals embedded; if not, call /admin/customers-with-stats or do separate call.
+  //     const ordersAggRes = await api.post("/admin/customers/orders-agg", { userIds: users.map(u => u._id) })
+  //     const ordersAgg = ordersAggRes.data || []
+  //     const ordersMap = {}
+  //     ordersAgg.forEach(o => { ordersMap[o._id] = { totalOrders: o.totalOrders || 0, totalSpent: o.totalSpent || 0 } })
+
+  //     const normalized = users.map(u => normalize(u, ordersMap))
+  //     setCustomers(normalized)
+  //   } catch (err) {
+  //     console.error("fetchCustomers error:", err)
+  //     // fallback: if API doesn't provide ordersAgg endpoint, map users without stats
+  //     try {
+  //       const usersRes = await api.get("/admin/customers")
+  //       setCustomers((usersRes.data.customers || usersRes.data || []).map(u => normalize(u)))
+  //     } catch (e) { console.error(e) }
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+
+  // useEffect(() => {
+  //   fetchCustomers()
+  // }, [])
+
+  useEffect(() => {
+    const loadCustomers = async () => {
+      const { customers } = await getAllCustomers();
+
+      const agg = await getCustomersOrderAgg({
+        userIds: customers.map(c => c._id),
+      });
+
+      const aggMap = {};
+      agg.forEach(a => {
+        aggMap[a._id] = a;
+      });
+
+      const merged = customers.map(c => ({
+        id: c._id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        status: "Active", // map later if needed
+        address: c.addresses?.[0]
+          ? {
+            street: c.addresses[0].addressLine1,
+            city: c.addresses[0].city,
+            state: c.addresses[0].state,
+            zip: c.addresses[0].pincode,
+            country: c.addresses[0].country,
+          }
+          : {},
+        totalOrders: aggMap[c._id]?.totalOrders || 0,
+        totalSpent: aggMap[c._id]?.totalSpent || 0,
+        joinedAt: c.createdAt,
+        orders: [],
+      }));
+
+      setCustomers(merged);
+    };
+
+    loadCustomers();
+  }, []);
+
 
   const filteredCustomers = customers.filter((customer) => {
     const matchesSearch =
-      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchQuery.toLowerCase())
+      customer.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.email?.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === "all" || customer.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -311,63 +418,72 @@ const CustomersManagement = () => {
     setIsDeleteDialogOpen(true)
   }
 
-  const handleAddCustomer = () => {
-    const newCustomer = {
-      id: Date.now().toString(),
-      name: formData.name,
-      email: formData.email,
-      phone: formData.phone,
-      avatar: "/new-customer.jpg",
-      status: formData.status,
-      address: {
-        street: formData.street,
-        city: formData.city,
-        state: formData.state,
-        zip: formData.zip,
-        country: formData.country,
-      },
-      totalOrders: 0,
-      totalSpent: 0,
-      joinedAt: new Date().toISOString().split("T")[0],
-      lastOrderAt: "-",
-      orders: [],
+  const handleAddCustomer = async () => {
+    try {
+      const res = await signup({
+        name: formData.name,
+        email: formData.email,
+        password: "Temp@123456", // admin-created
+        phone: formData.phone,
+      });
+     
+      setCustomers(prev => [
+        {
+          id: res._id,
+          name: res.name,
+          email: res.email,
+          phone: res.phone,
+          status: "Active",
+          address: {},
+          totalOrders: 0,
+          totalSpent: 0,
+          joinedAt: res.createdAt,
+          orders: [],
+        },
+        ...prev,
+      ]);
+
+      setIsAddModalOpen(false);
+      resetForm();
+    } catch (e) {
+      alert("Failed to create customer");
     }
-    setCustomers([newCustomer, ...customers])
-    setIsAddModalOpen(false)
-    resetForm()
   }
 
-  const handleEditCustomer = () => {
-    if (!selectedCustomer) return
-    const updatedCustomers = customers.map((c) =>
-      c.id === selectedCustomer.id
-        ? {
-            ...c,
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            status: formData.status,
-            address: {
-              street: formData.street,
-              city: formData.city,
-              state: formData.state,
-              zip: formData.zip,
-              country: formData.country,
-            },
-          }
-        : c,
-    )
-    setCustomers(updatedCustomers)
-    setIsEditModalOpen(false)
-    setSelectedCustomer(null)
-    resetForm()
+  const handleEditCustomer = async () => {
+
+    try {
+      await updateCustomer(selectedCustomer.id, {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+      });
+
+      setCustomers(prev =>
+        prev.map(c =>
+          c.id === selectedCustomer.id
+            ? { ...c, ...formData }
+            : c
+        )
+      );
+
+      setIsEditModalOpen(false);
+      setSelectedCustomer(null);
+      resetForm()
+    } catch {
+      alert("Update failed");
+    }
   }
 
-  const handleDeleteCustomer = () => {
-    if (!selectedCustomer) return
-    setCustomers(customers.filter((c) => c.id !== selectedCustomer.id))
-    setIsDeleteDialogOpen(false)
-    setSelectedCustomer(null)
+  const handleDeleteCustomer = async () => {
+    try {
+      await deleteCustomer(selectedCustomer.id);
+      setCustomers(prev => prev.filter(c => c.id !== selectedCustomer.id));
+      setIsDeleteDialogOpen(false);
+      setSelectedCustomer(null);
+    } catch {
+      alert("Delete failed");
+    }
   }
 
   const totalCustomers = customers.length
@@ -384,13 +500,12 @@ const CustomersManagement = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-white/10">
-            <Link href="/admin" className="flex items-center gap-3">
+            <Link to="/admin" className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="font-black text-lg">B</span>
               </div>
@@ -405,10 +520,9 @@ const CustomersManagement = () => {
             {sidebarLinks.map((link) => (
               <Link
                 key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
+                to={link.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <link.icon className="w-5 h-5" />
                 <span className="font-medium">{link.name}</span>
@@ -473,8 +587,8 @@ const CustomersManagement = () => {
               { label: "VIP Members", value: vipCustomers, icon: Users, color: "text-yellow-400" },
               {
                 label: "Total Revenue",
-                value: `$${totalRevenue.toLocaleString()}`,
-                icon: DollarSign,
+                value: `₹${totalRevenue.toLocaleString()}`,
+                icon: IndianRupee,
                 color: "text-red-400",
               },
             ].map((stat) => (
@@ -584,7 +698,7 @@ const CustomersManagement = () => {
                           </span>
                         </td>
                         <td className="p-4 text-gray-400">{customer.totalOrders}</td>
-                        <td className="p-4 font-medium">${customer.totalSpent.toLocaleString()}</td>
+                        <td className="p-4 font-medium">₹{customer.totalSpent.toLocaleString()}</td>
                         <td className="p-4 text-gray-400 text-sm">{formatDate(customer.joinedAt)}</td>
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
@@ -633,11 +747,10 @@ const CustomersManagement = () => {
                   <button
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === i + 1
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "border border-white/20 bg-transparent hover:bg-white/10"
-                    }`}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "border border-white/20 bg-transparent hover:bg-white/10"
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -680,17 +793,15 @@ const CustomersManagement = () => {
             <div className="flex border-b border-white/10">
               <button
                 onClick={() => setActiveTab("details")}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "details" ? "text-white border-b-2 border-red-500" : "text-gray-400 hover:text-white"
-                }`}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "details" ? "text-white border-b-2 border-red-500" : "text-gray-400 hover:text-white"
+                  }`}
               >
                 Details
               </button>
               <button
                 onClick={() => setActiveTab("orders")}
-                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === "orders" ? "text-white border-b-2 border-red-500" : "text-gray-400 hover:text-white"
-                }`}
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${activeTab === "orders" ? "text-white border-b-2 border-red-500" : "text-gray-400 hover:text-white"
+                  }`}
               >
                 Orders ({selectedCustomer.orders.length})
               </button>
@@ -725,8 +836,8 @@ const CustomersManagement = () => {
                       <p className="text-xs text-gray-500">Orders</p>
                     </div>
                     <div className="bg-white/5 rounded-lg p-4 text-center">
-                      <DollarSign className="w-5 h-5 mx-auto mb-2 text-gray-400" />
-                      <p className="text-xl font-bold">${selectedCustomer.totalSpent.toLocaleString()}</p>
+                      <IndianRupee className="w-5 h-5 mx-auto mb-2 text-gray-400" />
+                      <p className="text-xl font-bold">₹{selectedCustomer.totalSpent.toLocaleString()}</p>
                       <p className="text-xs text-gray-500">Spent</p>
                     </div>
                     <div className="bg-white/5 rounded-lg p-4 text-center">

@@ -23,16 +23,17 @@ export const addToCart = async (payload) => {
  * PUT /cart/update/:productId
  * body: { quantity }
  */
-export const updateCartItem = async (productId, payload) => {
-  const res = await api.put(`/cart/update/${productId}`, payload);
+export const updateCartItem = async (payload) => {
+  const res = await api.put(`/cart/update`, payload);
   return res.data;
 };
 
 /**
  * DELETE /cart/remove/:productId
  */
-export const removeFromCart = async (productId) => {
-  const res = await api.delete(`/cart/remove/${productId}`);
+export const removeFromCart = async (payload) => {
+  console.log("API Remove From Cart:", payload);
+  const res = await api.delete(`/cart/remove/${payload.productId}`, { data: payload});
   return res.data;
 };
 

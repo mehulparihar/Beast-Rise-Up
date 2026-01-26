@@ -138,9 +138,10 @@ export const getAllOrders = async (req, res) => {
 };
 
 export const updateOrderStatus = async (req, res) => {
+    console.log("Update Order Status Called");
     try {
         const { orderId } = req.params;
-        const { orderStatus, paymentStatus } = req.body;
+        const { orderStatus } = req.body;
 
         const order = await Order.findById(orderId);
         if (!order) return res.status(404).json({ success: false, message: "Order not found" });
@@ -151,7 +152,7 @@ export const updateOrderStatus = async (req, res) => {
         }
 
         if (orderStatus) order.orderStatus = orderStatus;
-        if (paymentStatus) order.paymentStatus = paymentStatus;
+        
 
         await order.save();
 

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Flame, Search, User, Heart, ShoppingCart, X, Menu, ChevronDown, Truck, RefreshCw, Shield, Sparkles } from "lucide-react"
+import useCartStore from '../../stores/useCartStore';
 
 const navLinks = [
   { label: "Shop", href: "/category/all" },
@@ -20,6 +21,12 @@ const Navbar = () => {
   const [searchOpen, setSearchOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [searchValue, setSearchValue] = useState("")
+  const { cart, loadCart } = useCartStore();
+
+
+  useEffect(() => {
+    loadCart();
+  }, []);
 
 
   useEffect(() => {
@@ -29,6 +36,19 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
   }, [])
+
+  const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const cartTotal = cart.reduce((sum, item) => {
+    const price =
+      item.product?.variants?.[0]?.discountedPrice ||
+      item.product?.price ||
+      0;
+    return sum + price * item.quantity;
+  }, 0);
+
+
+
   const navigate = useNavigate();
 
   return (
@@ -143,10 +163,12 @@ const Navbar = () => {
                   className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900 text-white font-semibold transition-colors hover:bg-gray-800"
                 >
                   <ShoppingCart size={18} />
-                  <span className="text-sm">₹249.99</span>
-                  <span className="flex items-center justify-center min-w-5 h-5 px-1 text-xs font-bold bg-red-500 text-white rounded-full">
-                    3
-                  </span>
+                  <span className="text-sm">₹{cartTotal.toFixed(2)}</span>
+                  {cartCount > 0 && (
+                    <span className="flex items-center justify-center min-w-5 h-5 px-1 text-xs font-bold bg-red-500 text-white rounded-full">
+                      {cartCount}
+                    </span>
+                  )}
                 </motion.button>
 
                 {/* Mobile Menu Toggle */}

@@ -5,7 +5,7 @@
  * - Optimistic updates for add/update/remove
  */
 
-import {create} from "zustand";
+import { create } from "zustand";
 import { getCart, addToCart as apiAddToCart, updateCartItem as apiUpdateCartItem, removeFromCart as apiRemoveFromCart, clearCart as apiClearCart } from "../api/cart.api";
 
 const CART_KEY = "cart_v1";
@@ -40,9 +40,9 @@ const useCartStore = create((set, get) => ({
   },
 
   // optimistic addToCart
-  addToCart: async (product, quantity = 1) => {
+  addToCart: async ({ product, productId, sku, size, colorName, quantity = 1 }) => {
     // product can be id or object. normalize:
-    const productId = typeof product === "string" ? product : product._id;
+    // const productId = typeof product === "string" ? product : product._id;
     const prev = get().cart;
     try {
       // optimistic update locally
@@ -59,7 +59,14 @@ const useCartStore = create((set, get) => ({
       localStorage.setItem(CART_KEY, JSON.stringify(next));
 
       // backend call
-      await apiAddToCart({ productId, quantity }); // server will return synced cart sometimes
+      await apiAddToCart({
+        product,
+        productId,
+        sku,
+        size,
+        colorName,
+        quantity,
+      }); // server will return synced cart sometimes
       // re-sync from backend to ensure accurate data
       await get().loadCart();
       return { success: true };
@@ -73,7 +80,7 @@ const useCartStore = create((set, get) => ({
   },
 
   // update quantity
-  updateQuantity: async (productId, quantity) => {
+  updateQuantity: async ({ productId, sku, size, colorName, quantity }) => {
     const prev = get().cart;
     try {
       const next = prev.map((it) =>
@@ -82,7 +89,13 @@ const useCartStore = create((set, get) => ({
       set({ cart: next });
       localStorage.setItem(CART_KEY, JSON.stringify(next));
 
-      await apiUpdateCartItem(productId, { quantity });
+      await apiUpdateCartItem({
+        productId,
+        sku,
+        size,
+        colorName,
+        quantity,
+      });
       await get().loadCart();
       return { success: true };
     } catch (err) {
@@ -93,14 +106,15 @@ const useCartStore = create((set, get) => ({
     }
   },
 
-  removeFromCart: async (productId) => {
+  removeFromCart: async (payload) => {
     const prev = get().cart;
     try {
+      const productId = payload.productId
       const next = prev.filter((it) => !(it.product._id === productId || it.product === productId));
       set({ cart: next });
       localStorage.setItem(CART_KEY, JSON.stringify(next));
 
-      await apiRemoveFromCart(productId);
+      await apiRemoveFromCart(payload);
       await get().loadCart();
       return { success: true };
     } catch (err) {

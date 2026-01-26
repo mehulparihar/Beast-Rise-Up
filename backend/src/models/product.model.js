@@ -3,7 +3,10 @@ import mongoose from "mongoose";
 const colorSchema = new mongoose.Schema({
   name: { type: String, required: true },
   hexCode: String,
-  images: [String], // cloudinary urls
+  images: [{
+      url: String,
+      public_id: String
+    }], // cloudinary urls
 });
 
 const variantSchema = new mongoose.Schema({

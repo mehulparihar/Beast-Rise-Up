@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const orderItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   quantity: { type: Number, default: 1 },
-  price: { type: Number, required: true }, // snapshot of product price
+  price: { type: Number}, // snapshot of product price
   variant: {
     size: { type: String },
     color: { type: String },
@@ -16,24 +16,27 @@ const orderSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     items: [orderItemSchema],
     shippingAddress: {
-      name: String,
+      fullName: String,
       addressLine1: String,
       addressLine2: String,
       city: String,
       state: String,
       country: String,
-      postalCode: String,
+      pincode: String,
       phone: String,
     },
+    payment: { type: mongoose.Schema.Types.ObjectId, ref: "Payment", required: true },
     paymentMethod: { type: String, enum: ["COD", "RAZORPAY"], required: true },
     paymentStatus: { type: String, enum: ["Pending", "Paid", "Failed"], default: "Pending" },
     orderStatus: {
       type: String,
-      enum: ["Processing", "Shipped", "Delivered", "Cancelled"],
+      enum: ["Processing", "Shipped", "Delivered", "Cancelled", "Pending"],
       default: "Processing",
     },
     totalAmount: { type: Number, required: true },
-    razorpayPaymentId: { type: String }, // store Razorpay payment id if online
+    shipping: { type: Number, default: 0 },
+    discount: { type: Number, default: 0 },
+    subtotal: { type: Number, required: true },
     coupon: { type: String },
   },
   { timestamps: true }

@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   Flame,
@@ -28,6 +28,9 @@ import {
 import { Link } from "react-router-dom"
 import Navbar from "../../components/layout/Navbar"
 import Footer from "../../components/layout/Footer"
+import useCartStore from "../../stores/useCartStore"
+import useAuthStore from "../../stores/useAuthStore"
+import { createPaymentOrder, verifyPayment } from "../../api/payment.api"
 
 
 
@@ -97,7 +100,7 @@ const recommendedProducts = [
 
 
 const CheckoutPage = () => {
-   const [cartItems, setCartItems] = useState(initialCartItems)
+  // const [cartItems, setCartItems] = useState(initialCartItems)
   const [step, setStep] = useState("cart")
   const [couponCode, setCouponCode] = useState("")
   const [appliedCoupon, setAppliedCoupon] = useState(null)
@@ -117,17 +120,64 @@ const CheckoutPage = () => {
     pincode: "",
   })
 
-  const updateQuantity = (id, delta) => {
-    setCartItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item)),
-    )
-  }
+  const {
+    cart: cartItems,
+    loadCart,
+    updateQuantity,
+    removeFromCart,
+  } = useCartStore();
 
-  const removeItem = (id) => {
-    setCartItems((items) => items.filter((item) => item.id !== id))
-  }
 
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const { user, fetchProfile } = useAuthStore();
+
+  // const updateQuantity = (id, delta) => {
+  //   setCartItems((items) =>
+  //     items.map((item) => (item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item)),
+  //   )
+  // }
+
+  // const removeItem = (id) => {
+  //   setCartItems((items) => items.filter((item) => item.id !== id))
+  // }
+
+  useEffect(() => {
+    loadCart();
+    fetchProfile();
+  }, []);
+
+  console.log(user);
+
+  useEffect(() => {
+    if (!user || !user.addresses?.length) return;
+
+    const defaultAddress =
+      user.addresses.find(addr => addr.isDefault) || user.addresses[0];
+
+    if (!defaultAddress) return;
+
+    const [firstName = "", lastName = ""] =
+      defaultAddress.fullName?.split(" ") || [];
+
+    setShippingInfo(prev => ({
+      ...prev,
+      firstName,
+      lastName,
+      phone: defaultAddress.phone || "",
+      address: defaultAddress.addressLine1 || "",
+      apartment: defaultAddress.addressLine2 || "",
+      city: defaultAddress.city || "",
+      state: defaultAddress.state || "",
+      email: user.email || "",
+      pincode: defaultAddress.pincode || "",
+    }));
+  }, [user]);
+
+
+  const subtotal = cartItems.reduce((sum, item) => {
+    const price = item.productSnapshot?.variant?.discountedPrice || 0
+    return sum + price * item.quantity
+  }, 0)
+
   const shipping = subtotal > 2000 ? 0 : 99
   const discount = couponDiscount
   const total = subtotal + shipping - discount
@@ -166,55 +216,66 @@ const CheckoutPage = () => {
   }
 
   const handlePayment = async () => {
-    setIsProcessing(true)
-
     try {
-      // Create order on backend
-      const res = await fetch("/api/razorpay", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: total }),
-      })
+      setIsProcessing(true);
 
-      if (!res.ok) {
-        throw new Error("Failed to create order")
-      }
+      const data = await createPaymentOrder({
+        amount: total,
+        shippingAddress: shippingInfo,
+      });
 
-      const order = await res.json()
+
+
+      if (!data.success) throw new Error("Order creation failed");
 
       const options = {
-        key: order.key,
-        amount: order.amount,
-        currency: order.currency,
+        key: data.key,
+        amount: data.order.amount,
+        currency: data.order.currency,
         name: "Beast Rise Up",
-        description: "Premium Streetwear Purchase",
-        order_id: order.id,
-        handler: (response) => {
-          // Handle successful payment
-          console.log("Payment successful:", response)
-          // Redirect to success page or show success message
-          window.location.href = `/checkout/success?payment_id=${response.razorpay_payment_id}`
+        description: "Streetwear Purchase",
+        order_id: data.order.id,
+
+        handler: async (response) => {
+          try {
+            await verifyPayment({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature,
+              paymentId: data.payment._id,
+            });
+
+            window.location.href =
+              `/checkout/success?order_id=${response.razorpay_order_id}`;
+          } catch (err) {
+            console.error("Payment verification failed", err);
+            alert("Payment verification failed. Please contact support.");
+            setIsProcessing(false);
+          }
+
         },
+
         prefill: {
-          name: `${shippingInfo.firstName} ${shippingInfo.lastName}`,
-          email: shippingInfo.email,
+          name: shippingInfo.firstName + " " + shippingInfo.lastName,
           contact: shippingInfo.phone,
+          email: shippingInfo.email,
         },
+
         theme: {
           color: "#dc2626",
         },
-        modal: {
-          ondismiss: () => {
-            setIsProcessing(false)
-          },
-        },
-      }
 
-      const razorpay = new window.Razorpay(options)
-      razorpay.open()
-    } catch (error) {
-      console.error("Payment error:", error)
-      setIsProcessing(false)
+        modal: {
+          ondismiss: () => setIsProcessing(false),
+        },
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.open();
+    } catch (err) {
+      console.error("Payment error:", err);
+      alert("Payment failed. Try again.");
+      setIsProcessing(false);
     }
   }
 
@@ -230,10 +291,11 @@ const CheckoutPage = () => {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
   }
+  console.log(cartItems);
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar/>
+      <Navbar />
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* Progress Steps */}
@@ -252,29 +314,26 @@ const CheckoutPage = () => {
                   <div key={s.key} className="flex items-center">
                     <div className="flex flex-col items-center gap-1.5">
                       <div
-                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${
-                          isActive
-                            ? "bg-gray-900 text-white shadow-lg"
-                            : isCompleted
-                              ? "bg-green-500 text-white"
-                              : "bg-gray-100 text-gray-400"
-                        }`}
+                        className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${isActive
+                          ? "bg-gray-900 text-white shadow-lg"
+                          : isCompleted
+                            ? "bg-green-500 text-white"
+                            : "bg-gray-100 text-gray-400"
+                          }`}
                       >
                         {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                       </div>
                       <span
-                        className={`text-xs sm:text-sm font-medium transition-colors ${
-                          isActive ? "text-gray-900" : isCompleted ? "text-green-600" : "text-gray-400"
-                        }`}
+                        className={`text-xs sm:text-sm font-medium transition-colors ${isActive ? "text-gray-900" : isCompleted ? "text-green-600" : "text-gray-400"
+                          }`}
                       >
                         {s.label}
                       </span>
                     </div>
                     {idx < 2 && (
                       <div
-                        className={`w-12 sm:w-20 h-0.5 mx-2 sm:mx-4 transition-colors ${
-                          isCompleted ? "bg-green-500" : "bg-gray-200"
-                        }`}
+                        className={`w-12 sm:w-20 h-0.5 mx-2 sm:mx-4 transition-colors ${isCompleted ? "bg-green-500" : "bg-gray-200"
+                          }`}
                       />
                     )}
                   </div>
@@ -294,7 +353,7 @@ const CheckoutPage = () => {
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Your cart is empty</h2>
             <p className="text-gray-500 mb-8">Looks like you haven&apos;t added anything yet.</p>
             <Link
-              href="/"
+              to="/category/all"
               className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white font-semibold rounded-xl hover:bg-gray-800 transition-colors"
             >
               Start Shopping
@@ -310,7 +369,7 @@ const CheckoutPage = () => {
                   <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
                     <h1 className="text-2xl font-bold text-gray-900">Shopping Cart ({cartItems.length} items)</h1>
                     <Link
-                      href="/"
+                      to="/category/all"
                       className="flex items-center gap-2 text-gray-500 hover:text-gray-900 text-sm font-medium transition-colors"
                     >
                       <ArrowLeft size={16} />
@@ -321,7 +380,7 @@ const CheckoutPage = () => {
                   <div className="space-y-4">
                     {cartItems.map((item) => (
                       <motion.div
-                        key={item.id}
+                        key={item.product._id}
                         variants={itemVariants}
                         layout
                         className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200"
@@ -329,8 +388,8 @@ const CheckoutPage = () => {
                         <div className="flex gap-4">
                           <div className="w-24 h-24 sm:w-28 sm:h-28 bg-gray-100 rounded-xl overflow-hidden flex-shrink-0">
                             <img
-                              src={item.image || "/placeholder.svg"}
-                              alt={item.name}
+                              src={item.productSnapshot.defaultImage || "/placeholder.svg"}
+                              alt={item.productSnapshot.title}
                               width={120}
                               height={120}
                               className="w-full h-full object-cover"
@@ -339,29 +398,54 @@ const CheckoutPage = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex justify-between gap-2">
                               <h3 className="font-semibold text-gray-900 text-sm sm:text-base line-clamp-2">
-                                {item.name}
+                                {item.productSnapshot.title}
                               </h3>
                               <button
-                                onClick={() => removeItem(item.id)}
+                                onClick={() => removeFromCart({
+                                  productId: item.product._id,
+                                  sku: item.productSnapshot.variant.sku,
+                                  size: item.productSnapshot.size,
+                                  colorName: item.productSnapshot.color.name,
+                                })}
                                 className="text-gray-400 hover:text-red-500 transition-colors p-1"
                               >
                                 <Trash2 size={18} />
                               </button>
                             </div>
                             <p className="text-sm text-gray-500 mt-1">
-                              Size: {item.size} | Color: {item.color}
+                              Size: {item.productSnapshot.size} | Color: {item.productSnapshot.color.name}
                             </p>
                             <div className="flex items-center justify-between mt-4">
                               <div className="flex items-center gap-1 bg-gray-100 rounded-lg">
                                 <button
-                                  onClick={() => updateQuantity(item.id, -1)}
+                                  onClick={() =>
+                                    updateQuantity(
+                                      {
+                                        productId: item.product._id,
+                                        sku: item.productSnapshot.variant.sku,
+                                        size: item.productSnapshot.size,
+                                        colorName: item.productSnapshot.color.name,
+                                        quantity: Math.max(1, item.quantity - 1),
+                                      }
+                                    )
+                                  }
                                   className="p-2 hover:bg-gray-200 rounded-l-lg transition-colors"
                                 >
                                   <Minus size={16} />
                                 </button>
                                 <span className="w-10 text-center font-semibold text-sm">{item.quantity}</span>
                                 <button
-                                  onClick={() => updateQuantity(item.id, 1)}
+                                  onClick={() =>
+                                    updateQuantity(
+                                      {
+                                        productId: item.product._id,
+                                        sku: item.productSnapshot.variant.sku,
+                                        size: item.productSnapshot.size,
+                                        colorName: item.productSnapshot.color.name,
+                                        quantity: item.quantity + 1,
+                                      }
+                                    )
+                                  }
                                   className="p-2 hover:bg-gray-200 rounded-r-lg transition-colors"
                                 >
                                   <Plus size={16} />
@@ -369,7 +453,7 @@ const CheckoutPage = () => {
                               </div>
                               <div className="text-right">
                                 <p className="font-bold text-gray-900">
-                                  ₹{(item.price * item.quantity).toLocaleString()}
+                                  ₹{(item.productSnapshot.variant.discountedPrice * item.quantity).toLocaleString()}
                                 </p>
                                 {item.originalPrice && (
                                   <p className="text-sm text-gray-400 line-through">
@@ -433,7 +517,7 @@ const CheckoutPage = () => {
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg font-bold text-gray-900">You May Also Like</h2>
                       <Link
-                        href="/"
+                        to="/"
                         className="text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
                       >
                         View All <ChevronRight size={16} />
@@ -450,7 +534,6 @@ const CheckoutPage = () => {
                             <img
                               src={product.image || "/placeholder.svg"}
                               alt={product.name}
-                              fill
                               className="object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                             <button className="absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white">
@@ -752,7 +835,7 @@ const CheckoutPage = () => {
                     <div key={item.id} className="flex gap-3">
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
-                          src={item.image || "/placeholder.svg"}
+                          src={item.productSnapshot.defaultImage || "/placeholder.svg"}
                           alt={item.name}
                           width={48}
                           height={48}
@@ -760,13 +843,16 @@ const CheckoutPage = () => {
                         />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{item.name}</p>
+                        <p className="text-sm font-medium text-gray-900 line-clamp-1">{item.productSnapshot.title}</p>
                         <p className="text-xs text-gray-500">
-                          {item.size} | Qty: {item.quantity}
+                          {item.productSnapshot.size} | Qty: {item.quantity}
                         </p>
                       </div>
                       <p className="text-sm font-semibold text-gray-900">
-                        ₹{(item.price * item.quantity).toLocaleString()}
+                        ₹{(
+                          item.productSnapshot.variant.discountedPrice *
+                          item.quantity
+                        ).toLocaleString()}
                       </p>
                     </div>
                   ))}

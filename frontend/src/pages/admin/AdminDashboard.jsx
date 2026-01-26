@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import {
   LayoutDashboard,
@@ -19,13 +19,15 @@ import {
 } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
 import { Link } from "react-router-dom"
+import { analytics as apianalytics } from "../../api/analytics.api"
+import { logout } from "../../api/auth.api"
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard, active: true },
   { name: "Products", href: "/admin/products", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
   { name: "Customers", href: "/admin/customers", icon: Users },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
+  // { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 const revenueData = [
@@ -62,39 +64,151 @@ const topProducts = [
 ]
 
 const AdminDashboard = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(null)
+  const [analytics, setAnalytics] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [revenueRange, setRevenueRange] = useState("30") // "7" | "30" | "90"
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setLoading(true)
+      try {
+        const res = await apianalytics();
+        setAnalytics(res.data)
+      } catch (err) {
+        console.error("Fetch analytics error", err)
+        setError("Failed to load analytics")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchAnalytics()
+  }, [])
+
+  
+  const formatCurrency = (n) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0)
+
+  const formatDateLabel = (isoDate) => {
+    try {
+      const d = new Date(isoDate)
+      return d.toLocaleDateString("en-IN", { month: "short", day: "numeric" })
+    } catch {
+      return isoDate
+    }
+  }
+
+  // derive display data (safe defaults)
+  const kpis = analytics?.kpis || { totalRevenue: 0, totalOrders: 0, totalCustomers: 0, pageViews: null }
 
   const stats = [
     {
       title: "Total Revenue",
-      value: "$45,231.89",
-      change: "+20.1%",
+      value: formatCurrency(kpis.totalRevenue),
+      change: "+0%",
       trend: "up",
       icon: DollarSign,
     },
     {
       title: "Total Orders",
-      value: "2,350",
-      change: "+15.2%",
+      value: (kpis.totalOrders ?? 0).toLocaleString(),
+      change: "+0%",
       trend: "up",
       icon: ShoppingCart,
     },
     {
       title: "Total Customers",
-      value: "1,247",
-      change: "+12.5%",
+      value: (kpis.totalCustomers ?? 0).toLocaleString(),
+      change: "+0%",
       trend: "up",
       icon: Users,
     },
     {
       title: "Page Views",
-      value: "48,352",
-      change: "-3.2%",
+      value: kpis.pageViews == null ? "—" : (kpis.pageViews ?? 0).toLocaleString(),
+      change: "-0%",
       trend: "down",
       icon: Eye,
     },
   ]
+
+  // revenue chart data selection
+  const revenueOverview = analytics?.revenueOverview || {}
+  const revenueData = (revenueRange === "7" ? revenueOverview.days7 : revenueRange === "90" ? revenueOverview.days90 : revenueOverview.days30) || []
+
+  const revenueChartData = revenueData.map((r) => ({
+    name: formatDateLabel(r._id || r.date || r.name),
+    revenue: r.revenue || 0,
+  }))
+
+  // category bar data
+  const salesByCategory = analytics?.salesByCategory || []
+  const categoryData = salesByCategory.map((c) => ({ name: c.category || "Unknown", sales: c.revenue || 0 }))
+
+  // recent orders
+  const recentOrdersRaw = analytics?.recentOrders || []
+  const recentOrders = recentOrdersRaw.map((o) => ({
+    id: o._id,
+    customer: o.user?.name || o.user?.email || "Unknown",
+    product: (o.items && o.items[0] && (o.items[0].productSnapshot?.title || o.items[0].product?.title)) || "—",
+    amount: formatCurrency(o.totalAmount || 0),
+    status: o.status || "Unknown",
+    createdAt: o.createdAt,
+  }))
+
+  // top products
+  const topProductsRaw = analytics?.topProducts || []
+  const topProducts = topProductsRaw.map((p) => ({
+    name: p.name,
+    sales: p.unitsSold || 0,
+    revenue: formatCurrency(p.revenue || 0),
+    image: p.image || "/placeholder.svg",
+  }))
+
+  // top customers
+  const topCustomersRaw = analytics?.topCustomers || []
+  const topCustomers = topCustomersRaw.map((c) => ({
+    name: c.name,
+    email: c.email,
+    orders: c.orders || 0,
+    totalSpent: formatCurrency(c.totalSpent || 0),
+    joined: c.joined ? new Date(c.joined).toLocaleDateString("en-IN") : "—",
+  }))
+
+
+  // const stats = [
+  //   {
+  //     title: "Total Revenue",
+  //     value: "₹45,231.89",
+  //     change: "+20.1%",
+  //     trend: "up",
+  //     icon: DollarSign,
+  //   },
+  //   {
+  //     title: "Total Orders",
+  //     value: "2,350",
+  //     change: "+15.2%",
+  //     trend: "up",
+  //     icon: ShoppingCart,
+  //   },
+  //   {
+  //     title: "Total Customers",
+  //     value: "1,247",
+  //     change: "+12.5%",
+  //     trend: "up",
+  //     icon: Users,
+  //   },
+  //   {
+  //     title: "Page Views",
+  //     value: "48,352",
+  //     change: "-3.2%",
+  //     trend: "down",
+  //     icon: Eye,
+  //   },
+  // ]
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex">
@@ -105,14 +219,13 @@ const AdminDashboard = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6 border-b border-white/10">
-            <Link href="/admin" className="flex items-center gap-3">
+            <Link to="/admin" className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="font-black text-lg">B</span>
               </div>
@@ -128,10 +241,9 @@ const AdminDashboard = () => {
             {sidebarLinks.map((link) => (
               <Link
                 key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
+                to={link.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <link.icon className="w-5 h-5" />
                 <span className="font-medium">{link.name}</span>
@@ -149,7 +261,9 @@ const AdminDashboard = () => {
                 <p className="font-medium truncate">Admin User</p>
                 <p className="text-xs text-gray-500 truncate">admin@beastrise.com</p>
               </div>
-              <button className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
+              <button
+                // onClick={() => logout()}
+                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
@@ -176,7 +290,7 @@ const AdminDashboard = () => {
             </div>
             <div className="flex items-center gap-3">
               <Link
-                href="/"
+                to="/"
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/10 transition-colors text-sm font-medium"
               >
                 View Store
@@ -203,9 +317,8 @@ const AdminDashboard = () => {
                       <stat.icon className="w-6 h-6 text-gray-400" />
                     </div>
                     <div
-                      className={`flex items-center gap-1 text-sm ${
-                        stat.trend === "up" ? "text-green-500" : "text-red-500"
-                      }`}
+                      className={`flex items-center gap-1 text-sm ${stat.trend === "up" ? "text-green-500" : "text-red-500"
+                        }`}
                     >
                       {stat.trend === "up" ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                       {stat.change}
@@ -236,13 +349,19 @@ const AdminDashboard = () => {
                     </button>
                     {dropdownOpen === "revenue" && (
                       <div className="absolute right-0 mt-2 w-40 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-10">
-                        <button className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
+                        <button
+                          onClick={() => { setRevenueRange("7"); setDropdownOpen(null) }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
                           Last 7 days
                         </button>
-                        <button className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
+                        <button
+                          onClick={() => { setRevenueRange("30"); setDropdownOpen(null) }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
                           Last 30 days
                         </button>
-                        <button className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
+                        <button
+                          onClick={() => { setRevenueRange("90"); setDropdownOpen(null) }}
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors">
                           Last 90 days
                         </button>
                       </div>
@@ -252,7 +371,7 @@ const AdminDashboard = () => {
                 <div className="p-6">
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={revenueData}>
+                      <LineChart data={revenueChartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                         <XAxis dataKey="name" stroke="#666" />
                         <YAxis stroke="#666" />
@@ -335,7 +454,7 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between p-6 border-b border-white/10">
                   <h3 className="text-lg font-semibold">Recent Orders</h3>
                   <Link
-                    href="/admin/orders"
+                    to="/admin/orders"
                     className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors"
                   >
                     View All
@@ -358,15 +477,14 @@ const AdminDashboard = () => {
                         <div className="text-right ml-4">
                           <p className="font-semibold">{order.amount}</p>
                           <span
-                            className={`inline-block px-2 py-0.5 text-xs rounded-full ${
-                              order.status === "Completed"
+                            className={`inline-block px-2 py-0.5 text-xs rounded-full ${order.status === "Completed"
                                 ? "bg-green-500/20 text-green-400"
                                 : order.status === "Processing"
                                   ? "bg-yellow-500/20 text-yellow-400"
                                   : order.status === "Shipped"
                                     ? "bg-blue-500/20 text-blue-400"
                                     : "bg-gray-500/20 text-gray-400"
-                            }`}
+                              }`}
                           >
                             {order.status}
                           </span>
@@ -384,7 +502,7 @@ const AdminDashboard = () => {
                 <div className="flex items-center justify-between p-6 border-b border-white/10">
                   <h3 className="text-lg font-semibold">Top Products</h3>
                   <Link
-                    href="/admin/products"
+                    to="/admin/products"
                     className="inline-flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors"
                   >
                     View All

@@ -5,8 +5,7 @@ import crypto from "crypto";
 import { sendEmail, resetPasswordTemplate } from "../services/sendEmail.js";
 import { OAuth2Client } from "google-auth-library";
 import Order from "../models/order.model.js";
-
-
+import mongoose from "mongoose";
 
 const generateTokens = (userId) => {
     const accessToken = jwt.sign({ userId }, process.env.ACCESS_TOKEN_SECRET, {
@@ -245,7 +244,7 @@ export const changePassword = async (req, res) => {
         const userId = req.user._id;
         const { currentPassword, newPassword } = req.body;
 
-        const user = await User.findById(userId);          
+        const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ success: false, message: "User not found" });
         }
@@ -417,3 +416,133 @@ export const verifyOtpAndCreateUser = async (req, res) => {
         res.status(500).json({ success: false, message: "Server error" });
     }
 };
+
+
+export const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find({ role: "customer" })
+            .select("name email phone avatar addresses createdAt")
+            .sort({ createdAt: -1 })
+
+        res.status(200).json({ customers: users })
+    } catch (err) {
+        res.status(500).json({ message: "Failed to fetch users" })
+    }
+}
+
+export const customersOrdersAgg = async (req, res) => {
+    try {
+        const { userIds } = req.body
+        
+        let match = {
+            paymentStatus: "Paid", // IMPORTANT
+        };
+        
+        if (Array.isArray(userIds) && userIds.length > 0) {
+            match.user = {
+                $in: userIds.map(id => new mongoose.Types.ObjectId(id)),
+            };
+        }
+
+        const agg = await Order.aggregate([
+            { $match: match },
+            {
+                $group: {
+                    _id: "$user",
+                    totalOrders: { $sum: 1 },
+                    totalSpent: { $sum: "$totalAmount" },
+                },
+            },
+        ])
+
+        res.status(200).json(agg)
+    } catch (err) {
+        res.status(500).json({ message: "Failed to aggregate orders" })
+    }
+}
+
+export const getUserById = async (req, res) => {
+    try {
+        const { id } = req.params
+
+        const user = await User.findById(id)
+            .select("-password -resetPasswordToken -resetPasswordExpires -otp -otpExpires")
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+
+        const orders = await Order.find({ user: id })
+            .sort({ createdAt: -1 })
+            .select("items totalAmount status createdAt")
+
+        res.status(200).json({
+            customer: {
+                ...user.toObject(),
+                orders,
+            },
+        })
+    } catch (err) {
+        res.status(500).json({ message: "Failed to fetch customer" })
+    }
+}
+
+export const updateUser = async (req, res) => {
+    try {
+        const { id } = req.params
+        const {
+            name,
+            email,
+            phone,
+            status,
+            address,
+        } = req.body
+
+        const user = await User.findById(id)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+
+        if (name !== undefined) user.name = name
+        if (email !== undefined) user.email = email
+        if (phone !== undefined) user.phone = phone
+
+        // Optional: status mapping (Active / Inactive / VIP)
+        if (status === "Inactive") {
+            user.isVerified = false
+        }
+
+        if (address) {
+            user.addresses = [
+                {
+                    ...address,
+                    isDefault: true,
+                },
+            ]
+        }
+
+        await user.save()
+
+        res.status(200).json({ message: "User updated successfully" })
+    } catch (err) {
+        res.status(500).json({ message: "Failed to update user" })
+    }
+}
+
+export const deleteUser = async (req, res) => {
+    try {
+        const { id } = req.params
+
+        const user = await User.findById(id)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" })
+        }
+
+        await Order.deleteMany({ user: id })
+        await user.deleteOne()
+
+        res.status(200).json({ message: "User deleted successfully" })
+    } catch (err) {
+        res.status(500).json({ message: "Failed to delete user" })
+    }
+}

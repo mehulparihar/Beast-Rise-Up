@@ -7,7 +7,7 @@ import api from "./axios";
  * returns { orderId, amount, currency }
  */
 export const createPaymentOrder = async (payload) => {
-  const res = await api.post("/payment/create-order", payload);
+  const res = await api.post("/payments/create-order", payload);
   return res.data;
 };
 
@@ -16,7 +16,7 @@ export const createPaymentOrder = async (payload) => {
  * body: { razorpay_order_id, razorpay_payment_id, razorpay_signature }
  */
 export const verifyPayment = async (payload) => {
-  const res = await api.post("/payment/verify", payload);
+  const res = await api.post("/payments/verify-payment", payload);
   return res.data;
 };
 

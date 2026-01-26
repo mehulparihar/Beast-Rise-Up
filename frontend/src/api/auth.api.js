@@ -113,3 +113,55 @@ export const verifyOtp = async (payload) => {
   const res = await api.post("/auth/verify-otp", payload);
   return res.data;
 };
+
+
+
+/**
+ * ADMIN – Customers
+ * Base: /admin/customers
+ */
+
+/**
+ * GET /admin/customers
+ * response: { customers: [] }
+ */
+export const getAllCustomers = async () => {
+  const res = await api.get("/auth/admin/customers");
+  return res.data;
+};
+
+/**
+ * GET /admin/customers/:id
+ * response: { customer }
+ */
+export const getCustomerById = async (id) => {
+  const res = await api.get(`/auth/admin/customers/${id}`);
+  return res.data;
+};
+
+/**
+ * PUT /admin/customers/:id
+ * body: { name, email, phone, status, address }
+ */
+export const updateCustomer = async (id, payload) => {
+  const res = await api.put(`/auth/admin/customers/${id}`, payload);
+  return res.data;
+};
+
+/**
+ * DELETE /admin/customers/:id
+ */
+export const deleteCustomer = async (id) => {
+  const res = await api.delete(`/auth/admin/customers/${id}`);
+  return res.data;
+};
+
+/**
+ * POST /admin/customers/orders-agg
+ * body: { userIds?: [] }
+ * response: [{ _id, totalOrders, totalSpent }]
+ */
+export const getCustomersOrderAgg = async (payload = {}) => {
+  const res = await api.post("/auth/admin/customers/orders-agg", payload);
+  return res.data;
+};

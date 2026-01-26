@@ -18,10 +18,18 @@ export const getCart = async (req, res) => {
 
 export const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1 } = req.body;
+    const { product,
+      productId,
+      sku,
+      size,
+      colorName,
+      quantity = 1, } = req.body;
 
-    if (!productId) {
-      return res.status(400).json({ success: false, message: "productId is required" });
+    if (!productId || !sku || !size || !colorName) {
+      return res.status(400).json({
+        success: false,
+        message: "productId, sku, size, colorName are required",
+      });
     }
 
     const productExists = await Product.findById(productId);
@@ -29,19 +37,53 @@ export const addToCart = async (req, res) => {
       return res.status(404).json({ success: false, message: "Product not found" });
     }
 
+    const variant = product.variants.find(v => v.sku === sku);
+    if (!variant) {
+      return res.status(400).json({ success: false, message: "Invalid SKU" });
+    }
+
+    const color = variant.colors.find(c => c.name === colorName);
+    if (!color) {
+      return res.status(400).json({ success: false, message: "Invalid color" });
+    }
+
     const user = await User.findById(req.user._id);
 
-    // check if product already exists -> increase quantity instead
-    const existingItem = user.cartItems.find(
-      item => item.product.toString() === productId
+    // same product + same variant + same size + same color
+    const existingItem = user.cartItems.find(item =>
+      item.product.toString() === productId &&
+      item.productSnapshot.variant.sku === sku &&
+      item.productSnapshot.size === size &&
+      item.productSnapshot.color.name === colorName
     );
 
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
       user.cartItems.push({
-        product: productId,
+        product: product._id,
         quantity,
+
+        productSnapshot: {
+          title: product.title,
+          slug: product.slug,
+          defaultImage: product.defaultImage,
+          brand: product.brand,
+          category: product.category,
+
+          variant: {
+            sku: variant.sku,
+            price: variant.price,
+            discountedPrice: variant.discountedPrice,
+          },
+
+          size,
+
+          color: {
+            name: color.name,
+            hexCode: color.hexCode,
+          },
+        },
       });
     }
 
@@ -52,7 +94,6 @@ export const addToCart = async (req, res) => {
       message: "Added to cart",
       cart: user.cartItems,
     });
-
   } catch (err) {
     console.error("Add To Cart Error:", err);
     return res.status(500).json({ success: false, message: "Server error" });
@@ -62,31 +103,36 @@ export const addToCart = async (req, res) => {
 
 export const updateCartItem = async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
+    const { productId, sku, size, colorName, quantity } = req.body;
 
-    if (!productId || quantity == null) {
+    if (!productId || !sku || !size || !colorName || quantity == null) {
       return res.status(400).json({
         success: false,
-        message: "productId and quantity are required",
+        message: "productId, sku, size, colorName and quantity are required",
       });
     }
 
     const user = await User.findById(req.user._id);
 
-    const item = user.cartItems.find(
-      (item) => item.product.toString() === productId
+    const itemIndex = user.cartItems.findIndex((item) =>
+      item.product.toString() === productId &&
+      item.productSnapshot.variant.sku === sku &&
+      item.productSnapshot.size === size &&
+      item.productSnapshot.color.name === colorName
     );
 
-    if (!item) {
-      return res.status(404).json({ success: false, message: "Item not found in cart" });
+    if (itemIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found in cart",
+      });
     }
 
+    // remove item if quantity <= 0
     if (quantity <= 0) {
-      user.cartItems = user.cartItems.filter(
-        (item) => item.product.toString() !== productId
-      );
+      user.cartItems.splice(itemIndex, 1);
     } else {
-      item.quantity = quantity;
+      user.cartItems[itemIndex].quantity = quantity;
     }
 
     await user.save();
@@ -104,14 +150,37 @@ export const updateCartItem = async (req, res) => {
 };
 
 export const removeCartItem = async (req, res) => {
+ 
   try {
-    const { productId } = req.params;
+    const { productId, sku, size, colorName } = req.body;
+
+
+    if (!productId || !sku || !size || !colorName) {
+      return res.status(400).json({
+        success: false,
+        message: "productId, sku, size, colorName are required",
+      });
+    }
 
     const user = await User.findById(req.user._id);
 
-    user.cartItems = user.cartItems.filter(
-      (item) => item.product.toString() !== productId
-    );
+    const initialLength = user.cartItems.length;
+
+    user.cartItems = user.cartItems.filter((item) => {
+      return !(
+        item.product.toString() === productId &&
+        item.productSnapshot.variant.sku === sku &&
+        item.productSnapshot.size === size &&
+        item.productSnapshot.color.name === colorName
+      );
+    });
+
+    if (user.cartItems.length === initialLength) {
+      return res.status(404).json({
+        success: false,
+        message: "Cart item not found",
+      });
+    }
 
     await user.save();
 

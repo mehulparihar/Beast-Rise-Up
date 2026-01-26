@@ -131,18 +131,18 @@ function OrderCard({
                   <div key={idx} className="flex items-center gap-4">
                     <div className="w-20 h-20 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                       <img
-                        src={item.product?.images?.[0] || "/placeholder.svg"}
-                        alt={item.product?.name}
+                        src={item.product?.defaultImage?.[0] || "/placeholder.svg"}
+                        alt={item.product?.title}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-gray-900 mb-1">{item.product?.name}</h4>
+                      <h4 className="font-semibold text-gray-900 mb-1">{item.product?.title}</h4>
                       <p className="text-sm text-gray-500">
                         Size: {item.variant?.size} · Color: {item.variant?.color} · Qty: {item.quantity}
                       </p>
                     </div>
-                    <p className="font-semibold text-gray-900">₹{item.price.toFixed(2)}</p>
+                    <p className="font-semibold text-gray-900">₹{item.variant?.price.toFixed(2)}</p>
                   </div>
                 ))}
               </div>
@@ -229,6 +229,7 @@ const OrdersPage = () => {
     const matchesFilter = selectedFilter === "all" || order.status === selectedFilter
     return matchesSearch && matchesFilter
   })
+  console.log("Filtered Orders:", filteredOrders);
 
   return (
     <div className="min-h-screen bg-gray-50">

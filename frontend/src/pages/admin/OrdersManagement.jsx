@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard,
@@ -26,13 +26,14 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { Link } from "react-router-dom"
+import { adminGetAllOrders, updateOrderStatus } from "../../api/order.api"
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Products", href: "/admin/products", icon: Package },
   { name: "Orders", href: "/admin/orders", icon: ShoppingCart, active: true },
   { name: "Customers", href: "/admin/customers", icon: Users },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
+  // { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 
@@ -167,8 +168,8 @@ const initialOrders = [
 const statusOptions = ["Pending", "Processing", "Shipped", "Delivered", "Cancelled"]
 
 const OrdersManagement = () => {
- const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [orders, setOrders] = useState(initialOrders)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [orders, setOrders] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -189,17 +190,95 @@ const OrdersManagement = () => {
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage)
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const updateOrderStatus = (orderId, newStatus) => {
-    setOrders(
-      orders.map((order) =>
-        order.id === orderId ? { ...order, status: newStatus, updatedAt: new Date().toISOString() } : order,
-      ),
-    )
-    if (selectedOrder?.id === orderId) {
-      setSelectedOrder({ ...selectedOrder, status: newStatus })
+  const updateStatus = async (orderId, newStatus) => {
+    console.log("Updating order:", orderId, "to status:", newStatus)
+    try {
+      const result = await updateOrderStatus(orderId, {
+        orderStatus: newStatus,
+      })
+      const res = result.order;
+
+      setOrders(prev =>
+        prev.map(o =>
+          o.id === orderId
+            ? {
+              ...o,
+              status: res.orderStatus,        
+              paymentStatus: res.paymentStatus,
+            }
+            : o
+        )
+      )
+
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => ({ ...prev, status: newStatus }))
+      }
+
+      setOrderStatusDropdown(null)
+    } catch (e) {
+      alert("Failed to update order status")
     }
-    setOrderStatusDropdown(null)
   }
+
+  const normalizeOrder = (o = {}) => {
+    const addr1 = o.shippingAddress?.addressLine1 ?? ""
+    const addr2 = o.shippingAddress?.addressLine2 ?? ""
+
+    return {
+      id: o._id ?? "",
+
+      customer: {
+        name: o.user?.name ?? "Guest",
+        email: o.user?.email ?? "-",
+        phone: o.shippingAddress?.phone ?? "-",
+      },
+
+      items: Array.isArray(o.items)
+        ? o.items.map(i => ({
+          name: i?.productSnapshot?.title ?? "Product",
+          quantity: i?.quantity ?? 0,
+          price: i?.price ?? 0,
+          image: i?.productSnapshot?.defaultImage ?? "/placeholder.svg",
+        }))
+        : [],
+
+      total: o.totalAmount ?? 0,
+
+      status: o.orderStatus ?? "Processing",
+
+      paymentMethod: o.paymentMethod ?? "-",
+
+      paymentStatus: o.paymentStatus ?? "Pending",
+
+      shippingAddress: {
+        street: [addr1, addr2].filter(Boolean).join(", ") || "-",
+        city: o.shippingAddress?.city ?? "-",
+        state: o.shippingAddress?.state ?? "-",
+        zip: o.shippingAddress?.pincode ?? "-",
+        country: o.shippingAddress?.country ?? "India",
+      },
+
+      createdAt: o.createdAt ?? null,
+      updatedAt: o.updatedAt ?? null,
+    }
+  }
+
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      try {
+        const res = await adminGetAllOrders()
+        console.log("Admin orders:", res)
+        const normalized = res.orders.map(normalizeOrder)
+        setOrders(normalized)
+      } catch (e) {
+        console.error("Failed to load orders", e)
+      }
+    }
+
+    loadOrders()
+  }, [])
+
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -266,13 +345,12 @@ const OrdersManagement = () => {
 
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-white/10">
-            <Link href="/admin" className="flex items-center gap-3">
+            <Link to="/admin" className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="font-black text-lg">B</span>
               </div>
@@ -287,10 +365,9 @@ const OrdersManagement = () => {
             {sidebarLinks.map((link) => (
               <Link
                 key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
+                to={link.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <link.icon className="w-5 h-5" />
                 <span className="font-medium">{link.name}</span>
@@ -461,7 +538,7 @@ const OrdersManagement = () => {
                             {order.items.reduce((sum, item) => sum + item.quantity, 0)} items
                           </span>
                         </td>
-                        <td className="p-4 font-medium">${order.total.toFixed(2)}</td>
+                        <td className="p-4 font-medium">₹{order.total.toFixed(2)}</td>
                         <td className="p-4">
                           <div className="relative">
                             <button
@@ -477,7 +554,7 @@ const OrdersManagement = () => {
                                 {statusOptions.map((status) => (
                                   <button
                                     key={status}
-                                    onClick={() => updateOrderStatus(order.id, status)}
+                                    onClick={() => updateStatus(order.id, status)}
                                     className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors"
                                   >
                                     {status}
@@ -521,11 +598,10 @@ const OrdersManagement = () => {
                   <button
                     key={i + 1}
                     onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === i + 1
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "border border-white/20 bg-transparent hover:bg-white/10"
-                    }`}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "border border-white/20 bg-transparent hover:bg-white/10"
+                      }`}
                   >
                     {i + 1}
                   </button>
@@ -627,7 +703,7 @@ const OrdersManagement = () => {
                         <p className="font-medium">{item.name}</p>
                         <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                       </div>
-                      <p className="font-semibold">${(item.price * item.quantity).toFixed(2)}</p>
+                      <p className="font-semibold">₹{(item.price * item.quantity).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
@@ -659,7 +735,7 @@ const OrdersManagement = () => {
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Subtotal</span>
-                      <span>${selectedOrder.total.toFixed(2)}</span>
+                      <span>₹{selectedOrder.total.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Shipping</span>
@@ -667,7 +743,7 @@ const OrdersManagement = () => {
                     </div>
                     <div className="flex justify-between font-semibold text-base pt-2 border-t border-white/10">
                       <span>Total</span>
-                      <span>${selectedOrder.total.toFixed(2)}</span>
+                      <span>₹{selectedOrder.total.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

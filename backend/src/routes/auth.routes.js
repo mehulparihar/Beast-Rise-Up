@@ -1,6 +1,6 @@
 import express from 'express';
-import { login, logout, signup, refreshToken, getProfile, forgotPassword, resetPassword,updateProfile, googleLogin, requestOtp, verifyOtpAndCreateUser, changePassword } from "../controllers/auth.controller.js";
-import { protectRoute } from '../middleware/auth.middleware.js';
+import { getAllUsers, customersOrdersAgg, getUserById, updateUser, deleteUser, login, logout, signup, refreshToken, getProfile, forgotPassword, resetPassword, updateProfile, googleLogin, requestOtp, verifyOtpAndCreateUser, changePassword } from "../controllers/auth.controller.js";
+import { adminRoute, protectRoute } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
@@ -16,5 +16,12 @@ router.post("/google", googleLogin);
 router.post("/send-otp", requestOtp);
 router.post("/verify-otp", verifyOtpAndCreateUser);
 router.put("/change-password", protectRoute, changePassword);
+
+router.get("/admin/customers", protectRoute, adminRoute, getAllUsers);
+router.post("/admin/customers/orders-agg", protectRoute, adminRoute, customersOrdersAgg);
+router.get("/admin/customers/:id", protectRoute, adminRoute, getUserById);
+router.put("/admin/customers/:id", protectRoute, adminRoute, updateUser);
+router.delete("/admin/customers/:id", protectRoute, adminRoute, deleteUser);
+
 
 export default router;

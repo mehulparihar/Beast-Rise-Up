@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   LayoutDashboard,
   Package,
   ShoppingCart,
   Users,
-  Settings,
   LogOut,
   Menu,
   Plus,
@@ -21,94 +20,51 @@ import {
   ChevronDown,
 } from "lucide-react"
 import { Link } from "react-router-dom"
+import { adminCreateProduct, adminDeleteProduct, adminGetAllProducts, adminUpdateProduct, toggleFeaturedProduct } from "../../api/product.api"
+
+// --- Helpers / model shapes ---
+const emptyVariant = () => ({
+  id: Date.now().toString(),
+  sku: "",
+  price: 0,
+  discountedPrice: null,
+  sizes: [],
+  colors: [], // { name, hexCode, images: [] }
+  stockBySizeColor: [], // { size, colorName, stock }
+})
+
+const emptyProduct = () => ({
+  id: Date.now().toString(),
+  title: "",
+  slug: "",
+  description: "",
+  category: "",
+  subCategory: "",
+  brand: "",
+  variants: [emptyVariant()],
+  tags: [],
+  defaultImage: "/placeholder.svg",
+  features: [],
+  details: { material: "", fit: "", care: "", origin: "" },
+  isActive: true,
+})
 
 const sidebarLinks = [
   { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { name: "Products", href: "/admin/products", icon: Package, active: true },
   { name: "Orders", href: "/admin/orders", icon: ShoppingCart },
   { name: "Customers", href: "/admin/customers", icon: Users },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 const categories = ["Hoodies", "T-Shirts", "Pants", "Shoes", "Accessories"]
 
-
-
-const initialProducts = [
-  {
-    id: "1",
-    name: "Beast Mode Hoodie",
-    category: "Hoodies",
-    price: 129.0,
-    stock: 45,
-    status: "Active",
-    image: "/black-hoodie-streetwear.png",
-    description: "Premium heavyweight hoodie with Beast Mode print",
-    sku: "BM-HOD-001",
-  },
-  {
-    id: "2",
-    name: "Rise Up Tee",
-    category: "T-Shirts",
-    price: 49.0,
-    stock: 120,
-    status: "Active",
-    image: "/black-tshirt-streetwear.jpg",
-    description: "Classic fit cotton tee with Rise Up graphic",
-    sku: "RU-TEE-001",
-  },
-  {
-    id: "3",
-    name: "Urban Joggers",
-    category: "Pants",
-    price: 89.0,
-    stock: 0,
-    status: "Out of Stock",
-    image: "/black-joggers-streetwear.jpg",
-    description: "Comfortable joggers with tapered fit",
-    sku: "UJ-PNT-001",
-  },
-  {
-    id: "4",
-    name: "Street Cap",
-    category: "Accessories",
-    price: 35.0,
-    stock: 89,
-    status: "Active",
-    image: "/black-cap-streetwear.jpg",
-    description: "Snapback cap with embroidered Beast logo",
-    sku: "SC-ACC-001",
-  },
-  {
-    id: "5",
-    name: "Beast Sneakers",
-    category: "Shoes",
-    price: 159.0,
-    stock: 23,
-    status: "Active",
-    image: "/black-sneakers-streetwear.jpg",
-    description: "High-top sneakers with premium leather",
-    sku: "BS-SHO-001",
-  },
-  {
-    id: "6",
-    name: "Limited Edition Jacket",
-    category: "Hoodies",
-    price: 249.0,
-    stock: 5,
-    status: "Draft",
-    image: "/black-jacket-streetwear.png",
-    description: "Exclusive limited edition bomber jacket",
-    sku: "LE-JAK-001",
-  },
-]
-
-const ProductsManagement = () => {
-   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [products, setProducts] = useState(initialProducts)
+export default function ProductsManagement() {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [products, setProducts] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -116,127 +72,243 @@ const ProductsManagement = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
-  const [formCategoryDropdownOpen, setFormCategoryDropdownOpen] = useState(false)
-  const [formStatusDropdownOpen, setFormStatusDropdownOpen] = useState(false)
-  const itemsPerPage = 5
+  const [imageFiles, setImageFiles] = useState({})
 
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    price: "",
-    stock: "",
-    status: "Active",
-    description: "",
-    sku: "",
-    image: "/diverse-products-still-life.png",
-  })
+  const itemsPerPage = 8
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
-    const matchesStatus = statusFilter === "all" || product.status === statusFilter
+  const [formData, setFormData] = useState(emptyProduct())
+
+  // --- Derived helpers ---
+  const priceRange = (p) => {
+    const prices = (p.variants || []).map((v) => (v.price ? Number(v.price) : null)).filter(Boolean)
+    if (!prices.length) return "-"
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    return min === max ? `₹${min.toFixed(2)}` : `₹${min.toFixed(2)} - ₹${max.toFixed(2)}`
+  }
+
+  const totalStock = (p) => {
+    return (p.variants || []).reduce((sum, v) => {
+      const s = (v.stockBySizeColor || []).reduce((s2, r) => s2 + (Number(r.stock) || 0), 0)
+      return sum + s
+    }, 0)
+  }
+
+  useEffect(() => {
+    const load = async () => {
+      const res = await adminGetAllProducts()
+
+      // 🔒 HARD GUARANTEE: products is always an array
+      const list =
+        Array.isArray(res) ? res :
+          Array.isArray(res?.products) ? res.products :
+            Array.isArray(res?.data) ? res.data :
+              []
+
+      setProducts(list)
+    }
+
+    load()
+
+
+  }, []);
+
+
+
+  // --- Filtering / pagination ---
+  const filtered = products.filter((prod) => {
+    const q = searchQuery.trim().toLowerCase()
+    const matchesSearch = !q || prod.title.toLowerCase().includes(q) || prod.brand?.toLowerCase().includes(q)
+    const matchesCategory = categoryFilter === "all" || prod.category === categoryFilter
+    const matchesStatus = statusFilter === "all" || (prod.isActive ? "Active" : "Inactive") === statusFilter
     return matchesSearch && matchesCategory && matchesStatus
   })
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
-  const paginatedProducts = filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage))
+  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      category: "",
-      price: "",
-      stock: "",
-      status: "Active",
-      description: "",
-      sku: "",
-      image: "/diverse-products-still-life.png",
-    })
+  // --- CRUD handlers (local state) ---
+  const openAdd = () => {
+    setFormData(emptyProduct())
+    setIsAddModalOpen(true)
   }
 
-  const handleAddProduct = () => {
-    const newProduct = {
-      id: Date.now().toString(),
-      name: formData.name,
-      category: formData.category,
-      price: Number.parseFloat(formData.price),
-      stock: Number.parseInt(formData.stock),
-      status: formData.status,
-      description: formData.description,
-      sku: formData.sku,
-      image: formData.image,
-    }
-    setProducts([newProduct, ...products])
-    setIsAddModalOpen(false)
-    resetForm()
-  }
-
-  const handleEditProduct = () => {
-    if (!selectedProduct) return
-    const updatedProducts = products.map((p) =>
-      p.id === selectedProduct.id
-        ? {
-            ...p,
-            name: formData.name,
-            category: formData.category,
-            price: Number.parseFloat(formData.price),
-            stock: Number.parseInt(formData.stock),
-            status: formData.status,
-            description: formData.description,
-            sku: formData.sku,
-            image: formData.image,
-          }
-        : p,
-    )
-    setProducts(updatedProducts)
-    setIsEditModalOpen(false)
-    setSelectedProduct(null)
-    resetForm()
-  }
-
-  const handleDeleteProduct = () => {
-    if (!selectedProduct) return
-    setProducts(products.filter((p) => p.id !== selectedProduct.id))
-    setIsDeleteDialogOpen(false)
-    setSelectedProduct(null)
-  }
-
-  const openEditModal = (product) => {
-    setSelectedProduct(product)
-    setFormData({
-      name: product.name,
-      category: product.category,
-      price: product.price.toString(),
-      stock: product.stock.toString(),
-      status: product.status,
-      description: product.description,
-      sku: product.sku,
-      image: product.image,
-    })
+  const openEdit = (prod) => {
+    // deep clone minimal
+    setSelectedProduct(prod)
+    setFormData(JSON.parse(JSON.stringify(prod)))
     setIsEditModalOpen(true)
   }
 
-  const openDeleteDialog = (product) => {
-    setSelectedProduct(product)
+  const saveNewProduct = async () => {
+    try {
+      const res = await adminCreateProduct(formData, imageFiles)
+
+      const saved = {
+        ...res,
+        id: res._id || res.id,
+      }
+
+      // optimistic insert
+      setProducts(p => [saved, ...p])
+
+      setIsAddModalOpen(false)
+      setFormData(emptyProduct())
+      setImageFiles({})
+    } catch (e) {
+      alert("Failed to create product")
+    }
+
+  }
+
+  const toggleFeatured = async (product) => {
+    const nextValue = !product.isFeatured
+
+    // Optimistic UI update
+    setProducts(prev =>
+      prev.map(p =>
+        p._id === product._id ? { ...p, isFeatured: nextValue } : p
+      )
+    )
+
+    try {
+      await toggleFeaturedProduct(product._id)
+    } catch (e) {
+      // rollback on failure
+      setProducts(prev =>
+        prev.map(p =>
+          p.id === product.id ? { ...p, isFeatured: product.isFeatured } : p
+        )
+      )
+      alert("Failed to update featured status")
+    }
+  }
+
+
+  const saveEditedProduct = async () => {
+    if (!selectedProduct) return
+
+    try {
+      const res = await adminUpdateProduct(selectedProduct._id, formData)
+
+      const updated = {
+        ...res,
+        id: res._id || res.id,
+      }
+
+      setProducts(p =>
+        p.map(x => (x.id === selectedProduct.id ? updated : x))
+      )
+
+      setIsEditModalOpen(false)
+      setSelectedProduct(null)
+    } catch (e) {
+      alert("Failed to update product")
+    }
+  }
+
+  const confirmDelete = (prod) => {
+    setSelectedProduct(prod)
     setIsDeleteDialogOpen(true)
   }
 
+  const doDelete = async () => {
+    if (!selectedProduct) return
+
+    try {
+      await adminDeleteProduct(selectedProduct._id)
+
+      // optimistic remove
+      setProducts(p => p.filter(x => x._id !== selectedProduct._id))
+
+      setIsDeleteDialogOpen(false)
+      setSelectedProduct(null)
+    } catch (e) {
+      alert("Failed to delete product")
+    }
+  }
+
+  // --- Variant helpers ---
+  const addVariant = () => {
+    setFormData((f) => ({ ...f, variants: [...(f.variants || []), emptyVariant()] }))
+  }
+
+  const removeVariant = (variantId) => {
+    setFormData((f) => ({ ...f, variants: (f.variants || []).filter((v) => v.id !== variantId) }))
+  }
+
+  const updateVariant = (variantId, patch) => {
+    setFormData((f) => ({
+      ...f,
+      variants: (f.variants || []).map((v) => (v.id === variantId ? { ...v, ...patch } : v)),
+    }))
+  }
+
+  // sizes, colors, stock rows
+  const addSizeToVariant = (variantId, size) => {
+    if (!size) return
+    updateVariant(variantId, (v) => {
+      // handled below simpler: patch with sizes
+    })
+    setFormData((f) => ({
+      ...f,
+      variants: f.variants.map((v) =>
+        v.id === variantId && !v.sizes.includes(size) ? { ...v, sizes: [...v.sizes, size] } : v,
+      ),
+    }))
+  }
+
+  const removeSizeFromVariant = (variantId, size) => {
+    setFormData((f) => ({
+      ...f,
+      variants: f.variants.map((v) => (v.id === variantId ? { ...v, sizes: v.sizes.filter((s) => s !== size) } : v)),
+    }))
+  }
+
+  const addColorToVariant = (variantId, color) => {
+    setFormData((f) => ({
+      ...f,
+      variants: f.variants.map((v) =>
+        v.id === variantId ? { ...v, colors: [...(v.colors || []), color] } : v,
+      ),
+    }))
+  }
+
+  const addStockRow = (variantId, row) => {
+    setFormData((f) => ({
+      ...f,
+      variants: f.variants.map((v) => (v.id === variantId ? { ...v, stockBySizeColor: [...(v.stockBySizeColor || []), row] } : v)),
+    }))
+  }
+
+  // tags, features helpers
+  const addTag = (tag) => {
+    if (!tag) return
+    setFormData((f) => ({ ...f, tags: [...(f.tags || []), tag] }))
+  }
+
+  const removeTag = (tag) => setFormData((f) => ({ ...f, tags: f.tags.filter((t) => t !== tag) }))
+
+  const addFeature = (feat) => {
+    if (!feat) return
+    setFormData((f) => ({ ...f, features: [...(f.features || []), feat] }))
+  }
+
+  const removeFeature = (feat) => setFormData((f) => ({ ...f, features: f.features.filter((x) => x !== feat) }))
+
+  // --- small UI bits ---
+  const getStatusLabel = (p) => (p.isActive ? "Active" : "Inactive")
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white flex">
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* Sidebar */}
+      {/* Sidebar omitted for brevity, reuse your previous sidebar markup */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-        }`}
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-[#111111] border-r border-white/10 transform transition-transform duration-300 lg:transform-none ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
       >
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-white/10">
-            <Link href="/admin" className="flex items-center gap-3">
+            <Link to="/admin" className="flex items-center gap-3">
               <div className="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center">
                 <span className="font-black text-lg">B</span>
               </div>
@@ -251,10 +323,9 @@ const ProductsManagement = () => {
             {sidebarLinks.map((link) => (
               <Link
                 key={link.name}
-                href={link.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
+                to={link.href}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${link.active ? "bg-white/10 text-white" : "text-gray-400 hover:bg-white/5 hover:text-white"
+                  }`}
               >
                 <link.icon className="w-5 h-5" />
                 <span className="font-medium">{link.name}</span>
@@ -279,9 +350,7 @@ const ProductsManagement = () => {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 min-w-0">
-        {/* Header */}
         <header className="sticky top-0 z-30 bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/10">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-4">
@@ -293,25 +362,22 @@ const ProductsManagement = () => {
               </button>
               <div>
                 <h1 className="text-xl font-bold">Products</h1>
-                <p className="text-sm text-gray-500">Manage your product inventory</p>
+                <p className="text-sm text-gray-500">Manage products with variants</p>
               </div>
             </div>
-            <button
-              onClick={() => {
-                resetForm()
-                setIsAddModalOpen(true)
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Add Product
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={openAdd}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium"
+              >
+                <Plus className="w-4 h-4" />
+                Add Product
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* Products Content */}
         <div className="p-6 space-y-6">
-          {/* Filters */}
           <div className="bg-[#111111] border border-white/10 rounded-xl p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
@@ -324,7 +390,7 @@ const ProductsManagement = () => {
                   className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors"
                 />
               </div>
-              {/* Category Filter Dropdown */}
+
               <div className="relative">
                 <button
                   onClick={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
@@ -359,7 +425,7 @@ const ProductsManagement = () => {
                   </div>
                 )}
               </div>
-              {/* Status Filter Dropdown */}
+
               <div className="relative">
                 <button
                   onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
@@ -379,7 +445,10 @@ const ProductsManagement = () => {
                     >
                       All Status
                     </button>
-                    {["Active", "Draft", "Out of Stock"].map((status) => (
+                    {[
+                      "Active",
+                      "Inactive",
+                    ].map((status) => (
                       <button
                         key={status}
                         onClick={() => {
@@ -397,7 +466,6 @@ const ProductsManagement = () => {
             </div>
           </div>
 
-          {/* Products Table */}
           <div className="bg-[#111111] border border-white/10 rounded-xl">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -405,17 +473,20 @@ const ProductsManagement = () => {
                   <tr className="border-b border-white/10">
                     <th className="text-left p-4 text-sm font-medium text-gray-500">Product</th>
                     <th className="text-left p-4 text-sm font-medium text-gray-500">Category</th>
+                    <th className="text-left p-4 text-sm font-medium text-gray-500">Brand</th>
+                    <th className="text-left p-4 text-sm font-medium text-gray-500">Variants</th>
                     <th className="text-left p-4 text-sm font-medium text-gray-500">Price</th>
                     <th className="text-left p-4 text-sm font-medium text-gray-500">Stock</th>
                     <th className="text-left p-4 text-sm font-medium text-gray-500">Status</th>
+                    <th className="text-left p-4 text-sm font-medium text-gray-500">Featured</th>
                     <th className="text-right p-4 text-sm font-medium text-gray-500">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   <AnimatePresence>
-                    {paginatedProducts.map((product) => (
+                    {paginated.map((product) => (
                       <motion.tr
-                        key={product.id}
+                        key={product._id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
@@ -423,57 +494,41 @@ const ProductsManagement = () => {
                       >
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <img
-                              src={product.image || "/placeholder.svg"}
-                              alt={product.name}
-                              className="w-12 h-12 rounded-lg object-cover bg-white/5"
-                            />
+                            <img src={product.defaultImage || "/placeholder.svg"} alt={product.title} className="w-12 h-12 rounded-lg object-cover bg-white/5" />
                             <div>
-                              <p className="font-medium">{product.name}</p>
-                              <p className="text-sm text-gray-500">{product.sku}</p>
+                              <p className="font-medium">{product.title}</p>
+                              <p className="text-sm text-gray-500">{product.slug}</p>
                             </div>
                           </div>
                         </td>
                         <td className="p-4 text-gray-400">{product.category}</td>
-                        <td className="p-4 font-medium">${product.price.toFixed(2)}</td>
+                        <td className="p-4 text-gray-400">{product.brand || "-"}</td>
+                        <td className="p-4 text-gray-400">{(product.variants || []).length}</td>
+                        <td className="p-4 font-medium">{priceRange(product)}</td>
+                        <td className="p-4">{totalStock(product)}</td>
                         <td className="p-4">
-                          <span
-                            className={`${
-                              product.stock === 0
-                                ? "text-red-400"
-                                : product.stock < 10
-                                  ? "text-yellow-400"
-                                  : "text-gray-400"
-                            }`}
-                          >
-                            {product.stock}
+                          <span className={`inline-block px-2 py-1 text-xs rounded-full ${product.isActive ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>
+                            {getStatusLabel(product)}
                           </span>
                         </td>
                         <td className="p-4">
-                          <span
-                            className={`inline-block px-2 py-1 text-xs rounded-full ${
-                              product.status === "Active"
-                                ? "bg-green-500/20 text-green-400"
-                                : product.status === "Draft"
-                                  ? "bg-yellow-500/20 text-yellow-400"
-                                  : "bg-red-500/20 text-red-400"
-                            }`}
+                          <button
+                            onClick={() => toggleFeatured(product)}
+                            className={`px-3 py-1 text-xs rounded-full transition-colors ${product.isFeatured
+                              ? "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30"
+                              : "bg-gray-500/20 text-gray-400 hover:bg-gray-500/30"
+                              }`}
                           >
-                            {product.status}
-                          </span>
+                            {product.isFeatured ? "Featured" : "Normal"}
+                          </button>
                         </td>
+
                         <td className="p-4">
                           <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEditModal(product)}
-                              className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                            >
+                            <button onClick={() => openEdit(product)} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
                               <Pencil className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => openDeleteDialog(product)}
-                              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white/5 transition-colors"
-                            >
+                            <button onClick={() => confirmDelete(product)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-white/5 transition-colors">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -485,38 +540,18 @@ const ProductsManagement = () => {
               </table>
             </div>
 
-            {/* Pagination */}
             <div className="flex items-center justify-between p-4 border-t border-white/10">
-              <p className="text-sm text-gray-500">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filteredProducts.length)} of {filteredProducts.length} products
-              </p>
+              <p className="text-sm text-gray-500">Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} products</p>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i + 1}
-                    onClick={() => setCurrentPage(i + 1)}
-                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
-                      currentPage === i + 1
-                        ? "bg-red-600 hover:bg-red-700"
-                        : "border border-white/20 bg-transparent hover:bg-white/10"
-                    }`}
-                  >
+                  <button key={i + 1} onClick={() => setCurrentPage(i + 1)} className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${currentPage === i + 1 ? "bg-red-600 hover:bg-red-700" : "border border-white/20 bg-transparent hover:bg-white/10"}`}>
                     {i + 1}
                   </button>
                 ))}
-                <button
-                  onClick={() => setCurrentPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
+                <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-lg border border-white/20 bg-transparent hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                   <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
@@ -525,209 +560,245 @@ const ProductsManagement = () => {
         </div>
       </main>
 
-      {/* Add/Edit Product Modal */}
+      {/* Add / Edit Modal (shared) */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#111111] border border-white/10 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#111111] border border-white/10 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-white/10">
               <h2 className="text-xl font-bold">{isAddModalOpen ? "Add New Product" : "Edit Product"}</h2>
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false)
-                  setIsEditModalOpen(false)
-                  setSelectedProduct(null)
-                  resetForm()
-                }}
-                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedProduct(null); setFormData(emptyProduct()); }} className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors"><X className="w-5 h-5" /></button>
             </div>
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Product Name</label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter product name"
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors"
-                  />
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400">Title</label>
+                  <input value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">SKU</label>
-                  <input
-                    type="text"
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    placeholder="Enter SKU"
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors"
-                  />
+                <div>
+                  <label className="text-sm text-gray-400">Slug</label>
+                  <input value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Category</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setFormCategoryDropdownOpen(!formCategoryDropdownOpen)}
-                      className="w-full flex items-center justify-between px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                      <span className="text-sm">{formData.category || "Select category"}</span>
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
-                    </button>
-                    {formCategoryDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-20">
-                        {categories.map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => {
-                              setFormData({ ...formData, category: cat })
-                              setFormCategoryDropdownOpen(false)
-                            }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors"
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                <div>
+                  <label className="text-sm text-gray-400">Category</label>
+                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg">
+                    <option value="">Select category</option>
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Brand</label>
+                  <input value={formData.brand} onChange={(e) => setFormData({ ...formData, brand: e.target.value })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">Default image</label>
+                <div className="flex items-center gap-3">
+                  <img src={formData.defaultImage || "/placeholder.svg"} className="w-24 h-24 rounded-lg object-cover bg-white/5" />
+                  <div>
+                    <input placeholder="image url" value={formData.defaultImage} onChange={(e) => setFormData({ ...formData, defaultImage: e.target.value })} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                    <label className="mt-2 inline-flex items-center gap-2 px-3 py-1 rounded border border-white/20 hover:bg-white/5 cursor-pointer">
+                      <Upload className="w-4 h-4" />
+                      Upload
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files)
+
+                          const fieldNames = files.map((_, i) => `v${vIndex}_c${cIndex}_img${i}`)
+
+                          // save mapping for backend
+                          updateVariant(v.id, {
+                            colors: v.colors.map((c, ci) =>
+                              ci === cIndex
+                                ? { ...c, imageFields: fieldNames }
+                                : c
+                            )
+                          })
+
+                          // store actual files
+                          setImageFiles(prev => {
+                            const next = { ...prev }
+                            fieldNames.forEach((f, i) => {
+                              next[f] = files[i]
+                            })
+                            return next
+                          })
+                        }}
+                      />
+                    </label>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Status</label>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => setFormStatusDropdownOpen(!formStatusDropdownOpen)}
-                      className="w-full flex items-center justify-between px-4 py-2 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors"
-                    >
-                      <span className="text-sm">{formData.status}</span>
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
-                    </button>
-                    {formStatusDropdownOpen && (
-                      <div className="absolute top-full left-0 mt-2 w-full bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl z-20">
-                        {(["Active", "Draft", "Out of Stock"]).map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => {
-                              setFormData({ ...formData, status })
-                              setFormStatusDropdownOpen(false)
-                            }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-white/5 transition-colors"
-                          >
-                            {status}
-                          </button>
-                        ))}
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">Description</label>
+                <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+              </div>
+
+              {/* Variants manager */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Variants</h3>
+                  <button onClick={addVariant} className="inline-flex items-center gap-2 px-3 py-1 rounded bg-red-600 hover:bg-red-700">Add Variant</button>
+                </div>
+
+                {(formData.variants || []).map((v, idx) => (
+                  <div key={v._id || v.id} className="bg-[#0b0b0b] border border-white/5 rounded-lg p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <input placeholder="SKU" value={v.sku} onChange={(e) => updateVariant(v.id, { sku: e.target.value })} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                          <input type="number" placeholder="Price" value={v.price} onChange={(e) => updateVariant(v.id, { price: Number(e.target.value) })} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                          <input type="number" placeholder="Discounted Price" value={v.discountedPrice || ""} onChange={(e) => updateVariant(v.id, { discountedPrice: e.target.value ? Number(e.target.value) : null })} className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                        </div>
+
+                        {/* sizes */}
+                        <div className="mt-3">
+                          <label className="text-sm text-gray-400">Sizes (comma separated)</label>
+                          <input value={(v.sizes || []).join(",")} onChange={(e) => updateVariant(v.id, { sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                        </div>
+
+                        {/* colors */}
+                        <div className="mt-3">
+                          <label className="text-sm text-gray-400">Colors (name|hex comma separated) example: Red|#ff0000,Black|#000</label>
+                          <input defaultValue="" onBlur={(e) => {
+                            const raw = e.target.value.trim()
+                            if (!raw) return
+                            const colors = raw.split(",").map(c => {
+                              const [name, hex] = c.split("|").map(x => x?.trim())
+                              return { name: name || "", hexCode: hex || "", images: [] }
+                            })
+                            updateVariant(v.id, { colors })
+                            e.target.value = ""
+                          }} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {(v.colors || []).map((c, cIndex) => (
+                              <div key={cIndex} className="flex items-center gap-2 mt-2">
+                                <div className="px-2 py-1 bg-white/5 rounded text-sm">
+                                  {c.name} {c.hexCode ? `(${c.hexCode})` : ""}
+                                </div>
+
+                                <label className="inline-flex items-center gap-2 px-2 py-1 rounded border border-white/20 hover:bg-white/5 cursor-pointer text-xs">
+                                  <Upload className="w-3 h-3" />
+                                  Images
+                                  <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*"
+                                    hidden
+                                    onChange={(e) => {
+                                      const files = Array.from(e.target.files)
+
+                                      // ✅ now indexes EXIST
+                                      const fieldNames = files.map(
+                                        (_, i) => `v${v.id}_c${cIndex}_img${i}`
+                                      )
+
+                                      // attach imageFields to this color
+                                      updateVariant(v.id, {
+                                        colors: v.colors.map((col, ci) =>
+                                          ci === cIndex
+                                            ? { ...col, imageFields: fieldNames }
+                                            : col
+                                        ),
+                                      })
+
+                                      // store actual files
+                                      setImageFiles(prev => {
+                                        const next = { ...prev }
+                                        fieldNames.forEach((f, i) => {
+                                          next[f] = files[i]
+                                        })
+                                        return next
+                                      })
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* stock rows */}
+                        <div className="mt-3">
+                          <label className="text-sm text-gray-400">Stock rows (size, color, stock)</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            <input placeholder="Size" id={`stock-size-${v.id}`} className="px-2 py-1 bg-white/5 border border-white/10 rounded" />
+                            <input placeholder="Color name" id={`stock-color-${v.id}`} className="px-2 py-1 bg-white/5 border border-white/10 rounded" />
+                            <div className="flex gap-2">
+                              <input placeholder="Stock" type="number" id={`stock-qty-${v.id}`} className="px-2 py-1 bg-white/5 border border-white/10 rounded w-full" />
+                              <button onClick={() => {
+                                const size = document.getElementById(`stock-size-${v.id}`).value.trim()
+                                const colorName = document.getElementById(`stock-color-${v.id}`).value.trim()
+                                const stock = Number(document.getElementById(`stock-qty-${v.id}`).value || 0)
+                                if (!size || !colorName) return
+                                addStockRow(v.id, { size, colorName, stock })
+                                document.getElementById(`stock-size-${v.id}`).value = ""
+                                document.getElementById(`stock-color-${v.id}`).value = ""
+                                document.getElementById(`stock-qty-${v.id}`).value = ""
+                              }} className="px-2 py-1 rounded bg-green-600">Add</button>
+                            </div>
+                          </div>
+
+                          <div className="mt-2">
+                            {(v.stockBySizeColor || []).map((r, i) => (
+                              <div key={i} className="flex items-center justify-between gap-3 p-2 bg-white/5 rounded mt-2">
+                                <div className="text-sm">{r.size} · {r.colorName}</div>
+                                <div className="text-sm">{r.stock}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
                       </div>
-                    )}
+
+                      <div>
+                        <button onClick={() => removeVariant(v.id)} className="text-red-400 hover:text-red-500">Remove</button>
+                      </div>
+                    </div>
                   </div>
+                ))}
+              </div>
+
+              {/* tags & features */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-400">Tags (comma separated)</label>
+                  <input defaultValue="" onBlur={(e) => { const raw = e.target.value.trim(); if (!raw) return; setFormData(f => ({ ...f, tags: [...(f.tags || []), ...raw.split(',').map(t => t.trim()).filter(Boolean)] })); e.target.value = '' }} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                  <div className="flex gap-2 mt-2 flex-wrap">{(formData.tags || []).map((t, i) => (<div key={i} className="px-2 py-1 bg-white/5 rounded">{t}</div>))}</div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Price</label>
-                  <input
-                    type="number"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="0.00"
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-400">Stock</label>
-                  <input
-                    type="number"
-                    value={formData.stock}
-                    onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
-                    placeholder="0"
-                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors"
-                  />
+                <div>
+                  <label className="text-sm text-gray-400">Features (press enter after typing)</label>
+                  <input onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); const v = e.target.value.trim(); if (!v) return; setFormData(f => ({ ...f, features: [...(f.features || []), v] })); e.target.value = '' } }} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                  <div className="flex gap-2 mt-2 flex-wrap">{(formData.features || []).map((f, i) => (<div key={i} className="px-2 py-1 bg-white/5 rounded">{f}</div>))}</div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-400">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter product description"
-                  rows={3}
-                  className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:border-red-500 transition-colors resize-none"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-400">Product Image</label>
-                <div className="flex items-center gap-4">
-                  <img
-                    src={formData.image || "/placeholder.svg"}
-                    alt="Product"
-                    className="w-20 h-20 rounded-lg object-cover bg-white/5"
-                  />
-                  <button className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-sm">
-                    <Upload className="w-4 h-4" />
-                    Upload Image
-                  </button>
-                </div>
-              </div>
+
             </div>
+
             <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false)
-                  setIsEditModalOpen(false)
-                  setSelectedProduct(null)
-                  resetForm()
-                }}
-                className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={isAddModalOpen ? handleAddProduct : handleEditProduct}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium"
-              >
-                {isAddModalOpen ? "Add Product" : "Save Changes"}
-              </button>
+              <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); setSelectedProduct(null); setFormData(emptyProduct()); }} className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-sm font-medium">Cancel</button>
+              <button onClick={isAddModalOpen ? saveNewProduct : saveEditedProduct} className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium">{isAddModalOpen ? 'Add Product' : 'Save Changes'}</button>
             </div>
           </motion.div>
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete dialog */}
       {isDeleteDialogOpen && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#111111] border border-white/10 rounded-xl w-full max-w-md"
-          >
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-[#111111] border border-white/10 rounded-xl w-full max-w-md">
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">Delete Product</h2>
-              <p className="text-gray-400">
-                Are you sure you want to delete "{selectedProduct?.name}"? This action cannot be undone.
-              </p>
+              <p className="text-gray-400">Are you sure you want to delete "{selectedProduct?.title}"? This action cannot be undone.</p>
             </div>
             <div className="flex items-center justify-end gap-3 p-6 border-t border-white/10">
-              <button
-                onClick={() => {
-                  setIsDeleteDialogOpen(false)
-                  setSelectedProduct(null)
-                }}
-                className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-sm font-medium"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteProduct}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium"
-              >
-                Delete
-              </button>
+              <button onClick={() => { setIsDeleteDialogOpen(false); setSelectedProduct(null); }} className="px-4 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors text-sm font-medium">Cancel</button>
+              <button onClick={doDelete} className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition-colors text-sm font-medium">Delete</button>
             </div>
           </motion.div>
         </div>
@@ -735,5 +806,3 @@ const ProductsManagement = () => {
     </div>
   )
 }
-
-export default ProductsManagement
