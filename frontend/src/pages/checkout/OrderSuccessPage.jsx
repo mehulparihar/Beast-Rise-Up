@@ -118,7 +118,7 @@ const OrderSuccessPage = () => {
         </div>
 
         {/* Footer */}
-        <Footer />
+        {/* <Footer /> */}
       </motion.div>
     </div>
   )

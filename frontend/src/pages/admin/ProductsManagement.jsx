@@ -141,17 +141,17 @@ export default function ProductsManagement() {
   }
 
   const getProductImage = (product) => {
-  // 1. explicit default image
-  // if (product?.defaultImage) return product.defaultImage;
+    // 1. explicit default image
+    // if (product?.defaultImage) return product.defaultImage;
 
-  // 2. first variant → first color → first image
-  const img = product?.variants?.[0]?.colors?.[0]?.images?.[0];
-  if (!img) return "/placeholder.svg";
+    // 2. first variant → first color → first image
+    const img = product?.variants?.[0]?.colors?.[0]?.images?.[0];
+    if (!img) return "/placeholder.svg";
 
-  // support string or cloudinary object
-  if (typeof img === "string") return img;
-  return img.url || img.secure_url || "/placeholder.svg";
-};
+    // support string or cloudinary object
+    if (typeof img === "string") return img;
+    return img.url || img.secure_url || "/placeholder.svg";
+  };
 
   const saveNewProduct = async () => {
     try {
@@ -632,9 +632,23 @@ export default function ProductsManagement() {
                 </div>
                 <div>
                   <label className="text-sm text-gray-400">Category</label>
-                  <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg">
-                    <option value="">Select category</option>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-white focus:outline-none focus:border-red-500 appearance-none"
+                  >
+                    <option className="bg-[#1a1a1a]" value="">
+                      Select category
+                    </option>
+                    {categories.map(c => (
+                      <option
+                        key={c}
+                        value={c}
+                        className="bg-[#1a1a1a] text-white"
+                      >
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -709,8 +723,34 @@ export default function ProductsManagement() {
 
                         {/* sizes */}
                         <div className="mt-3">
-                          <label className="text-sm text-gray-400">Sizes (comma separated)</label>
-                          <input value={(v.sizes || []).join(",")} onChange={(e) => updateVariant(v.id, { sizes: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg" />
+                          <label className="text-sm text-gray-400">
+                            Sizes (comma separated)
+                          </label>
+
+                          <input
+                            defaultValue={(v.sizes || []).join(", ")}
+                            onBlur={(e) => {
+                              const raw = e.target.value.trim()
+                              const sizes = raw
+                                .split(",")
+                                .map(s => s.trim())
+                                .filter(Boolean)
+
+                              updateVariant(v.id, { sizes })
+                            }}
+                            className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/10 rounded-lg text-white focus:outline-none focus:border-red-500"
+                          />
+
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {(v.sizes || []).map((size, i) => (
+                              <div
+                                key={i}
+                                className="px-2 py-1 bg-white/5 rounded text-sm"
+                              >
+                                {size}
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
                         {/* colors */}

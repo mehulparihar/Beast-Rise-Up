@@ -95,7 +95,7 @@ const OrderFailedPage = () => {
                 </div>
 
                 {/* Footer */}
-                <Footer />
+                {/* <Footer /> */}
             </motion.div>
         </div>
     )
