@@ -140,6 +140,19 @@ export default function ProductsManagement() {
     setIsEditModalOpen(true)
   }
 
+  const getProductImage = (product) => {
+  // 1. explicit default image
+  // if (product?.defaultImage) return product.defaultImage;
+
+  // 2. first variant → first color → first image
+  const img = product?.variants?.[0]?.colors?.[0]?.images?.[0];
+  if (!img) return "/placeholder.svg";
+
+  // support string or cloudinary object
+  if (typeof img === "string") return img;
+  return img.url || img.secure_url || "/placeholder.svg";
+};
+
   const saveNewProduct = async () => {
     try {
       const res = await adminCreateProduct(formData, imageFiles)
@@ -184,12 +197,50 @@ export default function ProductsManagement() {
     }
   }
 
+  // remove an existing image (Cloudinary url / object) from a color locally
+  const removeExistingImage = (variantId, colorIndex, imgIndex) => {
+    setFormData(f => ({
+      ...f,
+      variants: f.variants.map(v => {
+        if (v.id !== variantId) return v
+        const colors = (v.colors || []).map((col, ci) => {
+          if (ci !== colorIndex) return col
+          const imgs = Array.isArray(col.images) ? [...col.images] : []
+          imgs.splice(imgIndex, 1)
+          return { ...col, images: imgs }
+        })
+        return { ...v, colors }
+      })
+    }))
+  }
+
+  // remove local (not uploaded yet) file by its fieldName
+  const removeLocalFile = (fieldName) => {
+    setImageFiles(prev => {
+      const next = { ...prev }
+      delete next[fieldName]
+      return next
+    })
+
+    // also remove imageFields reference from the color(s) (so it won't be sent)
+    setFormData(f => ({
+      ...f,
+      variants: (f.variants || []).map(v => ({
+        ...v,
+        colors: (v.colors || []).map(col => {
+          if (!Array.isArray(col.imageFields)) return col
+          const filteredFields = col.imageFields.filter(fn => fn !== fieldName)
+          return { ...col, imageFields: filteredFields }
+        })
+      }))
+    }))
+  }
 
   const saveEditedProduct = async () => {
     if (!selectedProduct) return
 
     try {
-      const res = await adminUpdateProduct(selectedProduct._id, formData)
+      const res = await adminUpdateProduct(selectedProduct._id, formData, imageFiles)
 
       const updated = {
         ...res,
@@ -197,7 +248,7 @@ export default function ProductsManagement() {
       }
 
       setProducts(p =>
-        p.map(x => (x.id === selectedProduct.id ? updated : x))
+        p.map(x => (x._id === selectedProduct._id ? updated : x))
       )
 
       setIsEditModalOpen(false)
@@ -494,7 +545,7 @@ export default function ProductsManagement() {
                       >
                         <td className="p-4">
                           <div className="flex items-center gap-3">
-                            <img src={product.defaultImage || "/placeholder.svg"} alt={product.title} className="w-12 h-12 rounded-lg object-cover bg-white/5" />
+                            <img src={getProductImage(product) || "/placeholder.svg"} alt={product.title} className="w-12 h-12 rounded-lg object-cover bg-white/5" />
                             <div>
                               <p className="font-medium">{product.title}</p>
                               <p className="text-sm text-gray-500">{product.slug}</p>
@@ -682,7 +733,47 @@ export default function ProductsManagement() {
                                   {c.name} {c.hexCode ? `(${c.hexCode})` : ""}
                                 </div>
 
-                                <label className="inline-flex items-center gap-2 px-2 py-1 rounded border border-white/20 hover:bg-white/5 cursor-pointer text-xs">
+                                {/* existing images from backend (could be array of strings or objects) */}
+                                <div className="flex gap-2 items-center">
+                                  {(c.images || []).map((img, imgIdx) => {
+                                    // support { url, public_id } or string
+                                    const src = typeof img === "string" ? img : img?.url || img?.secure_url || img
+                                    return (
+                                      <div key={imgIdx} className="relative">
+                                        <img src={src} className="w-12 h-12 rounded object-cover bg-white/5" />
+                                        <button
+                                          onClick={() => removeExistingImage(v.id, cIndex, imgIdx)}
+                                          className="absolute -top-2 -right-2 bg-black/60 rounded-full p-1 text-xs"
+                                          title="Remove image"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    )
+                                  })}
+
+                                  {/* local previews for files not uploaded yet (imageFiles) */}
+                                  {Object.entries(imageFiles)
+                                    .filter(([field]) => field.startsWith(`v${v.id}_c${cIndex}_`))
+                                    .map(([field, file]) => {
+                                      const previewUrl = URL.createObjectURL(file)
+                                      return (
+                                        <div key={field} className="relative">
+                                          <img src={previewUrl} className="w-12 h-12 rounded object-cover bg-white/5" />
+                                          <button
+                                            onClick={() => removeLocalFile(field)}
+                                            className="absolute -top-2 -right-2 bg-black/60 rounded-full p-1 text-xs"
+                                            title="Remove (local)"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      )
+                                    })}
+                                </div>
+
+                                {/* upload input for this color */}
+                                <label className="inline-flex items-center gap-2 px-2 py-1 rounded border border-white/20 hover:bg-white/5 cursor-pointer text-xs ml-2">
                                   <Upload className="w-3 h-3" />
                                   Images
                                   <input
@@ -692,22 +783,19 @@ export default function ProductsManagement() {
                                     hidden
                                     onChange={(e) => {
                                       const files = Array.from(e.target.files)
+                                      if (!files.length) return
 
-                                      // ✅ now indexes EXIST
-                                      const fieldNames = files.map(
-                                        (_, i) => `v${v.id}_c${cIndex}_img${i}`
-                                      )
+                                      // create unique field names using variant id (v.id) and color index
+                                      const fieldNames = files.map((_, i) => `v${v.id}_c${cIndex}_img${Date.now()}_${i}`)
 
-                                      // attach imageFields to this color
+                                      // attach imageFields to this color object
                                       updateVariant(v.id, {
                                         colors: v.colors.map((col, ci) =>
-                                          ci === cIndex
-                                            ? { ...col, imageFields: fieldNames }
-                                            : col
+                                          ci === cIndex ? { ...col, imageFields: [...(col.imageFields || []), ...fieldNames] } : col
                                         ),
                                       })
 
-                                      // store actual files
+                                      // store File objects in imageFiles state
                                       setImageFiles(prev => {
                                         const next = { ...prev }
                                         fieldNames.forEach((f, i) => {
@@ -719,6 +807,7 @@ export default function ProductsManagement() {
                                   />
                                 </label>
                               </div>
+
                             ))}
                           </div>
                         </div>

@@ -142,7 +142,7 @@ const CheckoutPage = () => {
 
   useEffect(() => {
     loadCart();
-    fetchProfile();
+    // fetchProfile();
   }, []);
 
   console.log(user);
@@ -380,7 +380,7 @@ const CheckoutPage = () => {
                   <div className="space-y-4">
                     {cartItems.map((item) => (
                       <motion.div
-                        key={item.product._id}
+                        key={item?.productSnapshot.title}
                         variants={itemVariants}
                         layout
                         className="bg-white rounded-2xl p-4 sm:p-6 border border-gray-200"
@@ -832,7 +832,7 @@ const CheckoutPage = () => {
                 {/* Items Preview */}
                 <div className="space-y-3 mb-6 max-h-48 overflow-y-auto">
                   {cartItems.map((item) => (
-                    <div key={item.id} className="flex gap-3">
+                    <div key={item.productSnapshot.title} className="flex gap-3">
                       <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
                         <img
                           src={item.productSnapshot.defaultImage || "/placeholder.svg"}

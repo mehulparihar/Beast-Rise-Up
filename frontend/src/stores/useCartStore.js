@@ -43,11 +43,12 @@ const useCartStore = create((set, get) => ({
   addToCart: async ({ product, productId, sku, size, colorName, quantity = 1 }) => {
     // product can be id or object. normalize:
     // const productId = typeof product === "string" ? product : product._id;
+    console.log("Adding to cart:", { product, productId, sku, size, colorName, quantity });
     const prev = get().cart;
     try {
       // optimistic update locally
       let next = [...prev];
-      const idx = next.findIndex((i) => i.product._id === productId || i.product === productId);
+      const idx = next.findIndex((i) => i?.product?._id === productId || i?.product === productId);
       if (idx > -1) {
         next[idx] = { ...next[idx], quantity: next[idx].quantity + quantity };
       } else {

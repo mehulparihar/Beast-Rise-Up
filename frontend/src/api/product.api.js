@@ -99,8 +99,28 @@ export const adminCreateProduct = async (product, filesMap = {}) => {
 /**
  * ADMIN: PUT /products/admin/:id
  */
-export const adminUpdateProduct = async (id, payload) => {
-  const res = await api.put(`/products/admin/${id}`, payload);
+export const adminUpdateProduct = async (id, product, filesMap = {}) => {
+  const formData = new FormData()
+
+  formData.append("title", product.title || "")
+  formData.append("slug", product.slug || "")
+  formData.append("category", product.category || "")
+  formData.append("brand", product.brand || "")
+  formData.append("description", product.description || "")
+  formData.append("variants", JSON.stringify(product.variants || []))
+  formData.append("tags", JSON.stringify(product.tags || []))
+  formData.append("features", JSON.stringify(product.features || []))
+  formData.append("defaultImage", product.defaultImage || "")
+
+  Object.entries(filesMap).forEach(([field, file]) => {
+    formData.append(field, file)
+  })
+
+  const res = await api.put(`/products/admin/${id}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return res.data;
 };
 

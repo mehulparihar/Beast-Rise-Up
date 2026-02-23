@@ -1,6 +1,6 @@
 import redis from "../config/redis.js";
 import Product from "../models/product.model.js";
-import { uploadBufferToCloudinary } from "../services/cloudinaryService.js";
+import { uploadBufferToCloudinary, destroyImage, deleteFromCloudinary} from "../services/cloudinaryService.js";
 
 export const getAllProducts = async (req, res) => {
     try {
@@ -170,53 +170,84 @@ export const createProduct = async (req, res) => {
 
 
 export const updateProduct = async (req, res) => {
-    try {
-        const { id } = req.params;
-        // const payloadRaw = req.body.payload;
-        let payload = req.body;
-        // if (payloadRaw) {
-        //     try {
-        //         payload = JSON.parse(payloadRaw);
-        //     } catch (err) {
-        //         return res.status(400).json({ message: "Invalid JSON in payload" });
-        //     }
-        // }
+  try {
+    const { id } = req.params
+    const payload = req.body
+   
+    // 🔥 PARSE JSON FIELDS (CRITICAL)
+    payload.variants = payload.variants ? JSON.parse(payload.variants) : []
+    payload.tags = payload.tags ? JSON.parse(payload.tags) : []
+    payload.features = payload.features ? JSON.parse(payload.features) : []
 
+    const product = await Product.findById(id)
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" })
+    }
 
-        const fileMap = await uploadFiles(req.files || [], `products/${id}`);
+    const slug = payload.slug || product.slug || id
 
+    // Upload new files
+    const fileMap = await uploadFiles(
+      req.files || [],
+      `products/${slug}`
+    )
 
-        if (Array.isArray(payload.variants)) {
-            for (let vi = 0; vi < payload.variants.length; vi++) {
-                const variant = payload.variants[vi];
-                if (Array.isArray(variant.colors)) {
-                    for (let ci = 0; ci < variant.colors.length; ci++) {
-                        const color = variant.colors[ci];
-                        const imageFields = color.imageFields || [];
-                        const imgs = color.images || [];
-                        for (const f of imageFields) {
-                            if (fileMap[f]) imgs.push(fileMap[f]);
-                        }
-                        color.images = imgs;
-                        delete color.imageFields;
-                    }
-                }
-                const agg = computeVariantAgg(variant);
-                variant.minPrice = agg.minPrice;
-                variant.maxPrice = agg.maxPrice;
-                variant.totalStock = agg.totalStock || 0;
-            }
+    // Handle variants / colors
+    for (const variant of payload.variants) {
+      for (const color of variant.colors || []) {
+
+        // 🔥 DELETE removed images
+        if (Array.isArray(color.removedImages)) {
+          for (const publicId of color.removedImages) {
+            await deleteFromCloudinary(publicId)
+          }
         }
 
+        // 🔥 ADD new uploaded images
+        const newImages = []
+        for (const field of color.imageFields || []) {
+          if (fileMap[field]) newImages.push(fileMap[field])
+        }
 
-        const updated = await Product.findByIdAndUpdate(id, payload, { new: true });
-        if (!updated) return res.status(404).json({ message: "Product not found" });
-        res.json(updated);
-    } catch (error) {
-        console.log("Error in updateProduct controller", error.message);
-        res.status(500).json({ message: "Server error", error: error.message });
+        // 🔥 MERGE old + new
+        color.images = [
+          ...(Array.isArray(color.images) ? color.images : []),
+          ...newImages,
+        ]
+
+        delete color.imageFields
+        delete color.removedImages
+      }
+
+      const agg = computeVariantAgg(variant)
+      variant.minPrice = agg.minPrice
+      variant.maxPrice = agg.maxPrice
+      variant.totalStock = agg.totalStock || 0
     }
-};
+
+    // 🔥 DEFAULT IMAGE FIX
+    if (!payload.defaultImage) {
+      payload.defaultImage =
+        payload.variants?.[0]?.colors?.[0]?.images?.[0]?.url || ""
+    }
+
+    const updated = await Product.findByIdAndUpdate(
+      id,
+      payload,
+      { new: true, runValidators: true }
+    )
+
+    res.json(updated)
+
+  } catch (error) {
+    console.error("Error in updateProduct controller:", error)
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    })
+  }
+}
+
 
 export const deleteProduct = async (req, res) => {
     try {

@@ -30,3 +30,17 @@ export const deleteFromCloudinary = async (publicId) => {
     }
 };
 
+
+
+export const destroyImage = async (publicId) => {
+  try {
+    if (!publicId) return null;
+    const result = await cloudinary.uploader.destroy(publicId);
+    // console.log(`Cloudinary destroy [${publicId}]:`, result.result);
+    return result;
+  } catch (error) {
+    console.error(`Failed to destroy image [${publicId}]:`, error.message);
+    // Don't throw — let the caller continue even if one image fails
+    return null;
+  }
+};

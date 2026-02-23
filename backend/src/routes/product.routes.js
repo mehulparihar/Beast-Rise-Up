@@ -15,7 +15,7 @@ router.get("/:id", getProductById);
 
 router.patch("/admin/:id", protectRoute, adminRoute, toggleFeaturedProduct);
 router.post("/admin/", protectRoute, adminRoute, upload.any(), createProduct); 
-router.put("/admin/:id", protectRoute, adminRoute, upload.array("images", 20), updateProduct);
+router.put("/admin/:id", protectRoute, adminRoute, upload.any(), updateProduct);
 router.delete("/admin/:id", protectRoute, adminRoute, deleteProduct);
 
 

@@ -11,7 +11,7 @@ const navLinks = [
   { label: "Women", href: "/category/women" },
   { label: "Streetwear", href: "/category/streetwear" },
   { label: "Gymwear", href: "/category/gymwear" },
-  { label: "New Arrivals", href: "/category" },
+  // { label: "New Arrivals", href: "/category" },
 ]
 
 
@@ -53,7 +53,7 @@ const Navbar = () => {
 
   return (
     <>
-      <div className="bg-gray-900 text-white text-center py-2.5 text-sm font-medium tracking-wide">
+      {/* <div className="bg-gray-900 text-white text-center py-2.5 text-sm font-medium tracking-wide">
         <div className="flex items-center justify-center gap-2">
           <Sparkles size={14} className="text-red-500" />
           <span>
@@ -61,7 +61,7 @@ const Navbar = () => {
           </span>
           <Sparkles size={14} className="text-red-500" />
         </div>
-      </div>
+      </div> */}
 
       <header
         className={`sticky top-0 z-50 w-full transition-all duration-500 ${isScrolled ? "bg-white/95 backdrop-blur-xl shadow-lg shadow-gray-200/50" : "bg-white"
@@ -213,10 +213,10 @@ const Navbar = () => {
                   <Truck size={16} className="text-red-500" />
                   <span>Free Shipping ₹499+</span>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* <div className="flex items-center gap-2">
                   <RefreshCw size={16} className="text-red-500" />
                   <span>30-Day Returns</span>
-                </div>
+                </div> */}
               </div>
             </div>
           </div>

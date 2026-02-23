@@ -181,7 +181,7 @@ const ProductDetailPage = () => {
   const { productId } = useParams();
   const navigate = useNavigate();
 
-  const { list: products, loadProducts} = useProductStore();
+  const { list: products, loadProducts } = useProductStore();
   const { addToCart } = useCartStore();
   const { add, remove, wishlist } = useWishlistStore();
 
@@ -195,18 +195,48 @@ const ProductDetailPage = () => {
 
   console.log("ProductDetailPage product:", product);
   const variant = product?.variants?.[0];
-useMemo
+
   useEffect(() => {
-    if (variant?.colors?.length) {
-      setSelectedColor(variant.colors[0]);
+    if (!variant) {
+      setSelectedColor(null);
+      setCurrentImageIndex(0);
+      return;
     }
-  }, [variant]);
+
+    // prefer keeping same color by name, otherwise pick first available
+    const prevName = selectedColor?.name;
+    const found = variant.colors?.find((c) => c.name === prevName);
+    const pick = found || variant.colors?.[0] || null;
+    setSelectedColor(pick);
+    setCurrentImageIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]); // intentionally only depend on variant
 
   const images = useMemo(() => {
-    if (selectedColor?.images?.length) return selectedColor.images;
+    // helper to get URL from a stored image (string or object)
+    const toUrl = (img) => {
+      if (!img) return null;
+      if (typeof img === "string") return img;
+      // possible cloudinary shapes: { url, secure_url, public_id }
+      return img.url || img.secure_url || img.secure || img.public_url || null;
+    }
+
+    // 1) if selectedColor has images, use them
+    if (selectedColor?.images && selectedColor.images.length) {
+      const mapped = selectedColor.images.map(toUrl).filter(Boolean);
+      if (mapped.length) return mapped;
+    }
+
+    // 2) if product has defaultImage or top-level images
     if (product?.defaultImage) return [product.defaultImage];
+    if (product?.images && product.images.length) {
+      return product.images.map(toUrl).filter(Boolean);
+    }
+
+    // fallback to empty array (component should handle length 0)
     return [];
   }, [selectedColor, product]);
+
 
   const price = variant?.discountedPrice ?? variant?.price ?? 0;
   const originalPrice =
@@ -227,10 +257,10 @@ useMemo
   const stockLeft =
     selectedSize && selectedColor
       ? variant.stockBySizeColor.find(
-          (s) =>
-            s.size === selectedSize &&
-            s.colorName === selectedColor.name
-        )?.stock
+        (s) =>
+          s.size === selectedSize &&
+          s.colorName === selectedColor.name
+      )?.stock
       : null;
 
   const relatedProducts = products
@@ -422,21 +452,30 @@ useMemo
                     Color: <span className="font-normal text-gray-600">{selectedColor?.name}</span>
                   </span>
                 </div>
+
                 <div className="flex gap-3">
-                  {variant.colors.map((color) => (
+                  {variant?.colors?.map((color, idx) => (
                     <button
-                      key={color.name}
-                      onClick={() => setSelectedColor(color)}
-                      className={`w-10 h-10 rounded-full transition-all ${selectedColor?.name === color.name
-                        ? "ring-2 ring-red-500 ring-offset-2"
-                        : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
+                      key={color.name || idx}
+                      onClick={() => {
+                        setSelectedColor(color)
+                        setCurrentImageIndex(0) // reset image on color change
+                      }}
+                      className={`w-10 h-10 rounded-full transition-all 
+          ${selectedColor?.name === color.name
+                          ? "ring-2 ring-red-500 ring-offset-2"
+                          : "hover:ring-2 hover:ring-gray-300 hover:ring-offset-2"
                         }`}
-                      style={{ backgroundColor: color.hex }}
+                      style={{
+                        backgroundColor: color.hexCode || color.hex || "#e5e7eb",
+                      }}
                       title={color.name}
+                      aria-label={color.name}
                     />
                   ))}
                 </div>
               </div>
+
 
               {/* Size Selection */}
               <div className="mb-6">
@@ -841,7 +880,7 @@ useMemo
                     <span className="text-sm font-medium text-gray-900">{item.rating}</span>
                     <span className="text-sm text-gray-500">({item.reviews})</span>
                   </div>
-                  <p className="text-gray-900 font-bold">${item.price.toFixed(2)}</p>
+                  <p className="text-gray-900 font-bold">${item.price?.toFixed(2) || 0}</p>
                 </Link>
               </motion.div>
             ))}

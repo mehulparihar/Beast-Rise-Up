@@ -26,30 +26,21 @@ import ShippingPolicyPage from "../pages/policies/ShippingPolicyPage";
 import RefundPolicyPage from "../pages/policies/RefundPolicyPage";
 import NotFoundPage from "../pages/NotFoundPage";
 
+import { RequireAuth, RequireAdmin } from "../auth/RouteGuards";
+
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* public */}
       <Route path="/" element={<HomePage />} />
       <Route path="/category/:categoryName" element={<ProductsPage />} />
       <Route path="/search/:searchParams" element={<SearchPage />} />
       <Route path="/product/:productId" element={<ProductDetailPage />} />
 
-
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
       <Route path="/forgot-password" element={<ForgetpasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetpasswordPage />} />
-
-
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/checkout/success" element={<OrderSuccessPage />} />
-
-      <Route path="/account" element={<ProfilePage />} />
-      <Route path="/account/orders" element={<OrdersPage />} />
-      <Route path="/account/wishlist" element={<WishlistPage />} />
-      <Route path="/account/addresses" element={<AddressPage />} />
-      <Route path="/account/settings" element={<SettingsPage />} />
-      <Route path="/account/gift-vouchers" element={<VouchersPage />} />
 
       <Route path="/contact" element={<ContactPage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -57,14 +48,108 @@ export default function AppRoutes() {
       <Route path="/shipping-policy" element={<ShippingPolicyPage />} />
       <Route path="/refund-policy" element={<RefundPolicyPage />} />
 
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/customers" element={<CustomersManagement />} />
-      <Route path="/admin/products" element={<ProductsManagement />} />
-      <Route path="/admin/orders" element={<OrdersManagement />} />
+      {/* user-only routes */}
+      <Route
+        path="/checkout"
+        element={
+          <RequireAuth>
+            <CheckoutPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/checkout/success"
+        element={
+          <RequireAuth>
+            <OrderSuccessPage />
+          </RequireAuth>
+        }
+      />
 
+      <Route
+        path="/account"
+        element={
+          <RequireAuth>
+            <ProfilePage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account/orders"
+        element={
+          <RequireAuth>
+            <OrdersPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account/wishlist"
+        element={
+          <RequireAuth>
+            <WishlistPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account/addresses"
+        element={
+          <RequireAuth>
+            <AddressPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account/settings"
+        element={
+          <RequireAuth>
+            <SettingsPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/account/gift-vouchers"
+        element={
+          <RequireAuth>
+            <VouchersPage />
+          </RequireAuth>
+        }
+      />
 
-       <Route path="*" element={<NotFoundPage/>} />
+      {/* admin-only routes */}
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminDashboard />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/customers"
+        element={
+          <RequireAdmin>
+            <CustomersManagement />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/products"
+        element={
+          <RequireAdmin>
+            <ProductsManagement />
+          </RequireAdmin>
+        }
+      />
+      <Route
+        path="/admin/orders"
+        element={
+          <RequireAdmin>
+            <OrdersManagement />
+          </RequireAdmin>
+        }
+      />
 
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

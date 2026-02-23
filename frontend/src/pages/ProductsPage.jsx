@@ -284,6 +284,21 @@ const ProductsPage = () => {
     Bags: "bags",
   };
 
+  const getProductImage = (product) => {
+    // 1. default image
+    // if (product?.defaultImage) return product.defaultImage;
+
+    // 2. first variant → first color → first image
+    const img =
+      product?.variants?.[0]?.colors?.[0]?.images?.[0];
+
+    if (!img) return "/placeholder.svg";
+
+    // handle string or cloudinary object
+    if (typeof img === "string") return img;
+    return img.url || img.secure_url || "/placeholder.svg";
+  };
+
   const getDefaultSelection = (product) => {
     const variant = product?.variants?.[0];
     if (!variant) return null;
@@ -688,7 +703,7 @@ const ProductsPage = () => {
                       title={product.title}
                       price={product.variants[0].discountedPrice}
                       originalPrice={product.variants[0].price}
-                      image={product.defaultImage}
+                      image={getProductImage(product)}
                       badge={product.isFeatured ? "Featured" : null}
                       rating={product.ratingAverage}
                       reviews={product.ratingCount}
@@ -718,7 +733,7 @@ const ProductsPage = () => {
                       title={product.title}
                       price={product.variants[0].discountedPrice}
                       originalPrice={product.variants[0].price}
-                      image={product.defaultImage}
+                      image={getProductImage(product)}
                       badge={product.isFeatured ? "Featured" : null}
                       rating={product.ratingAverage}
                       reviews={product.ratingCount}
