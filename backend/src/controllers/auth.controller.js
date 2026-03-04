@@ -293,6 +293,7 @@ export const googleLogin = async (req, res) => {
     const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     try {
         const googleData = req.body.credential;
+        console.log(googleData);
 
         if (!googleData) {
             return res.status(400).json({ message: "No Google data received" });
