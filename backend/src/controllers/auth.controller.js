@@ -23,20 +23,42 @@ const storeRefreshToken = async (userId, refreshToken) => {
     await redis.set(`refresh_token:${userId}`, refreshToken, "EX", 7 * 24 * 60 * 60); // 7days
 };
 
+// const setCookies = (res, accessToken, refreshToken) => {
+//     res.cookie("accessToken", accessToken, {
+//         httpOnly: true, // prevent XSS attacks, cross site scripting attack
+//         secure: process.env.NODE_ENV === "production",
+//         sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
+//         maxAge: 15 * 60 * 1000, // 15 minutes
+//     });
+//     res.cookie("refreshToken", refreshToken, {
+//         httpOnly: true, // prevent XSS attacks, cross site scripting attack
+//         secure: process.env.NODE_ENV === "production",
+//         sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
+//         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days  
+//     });
+// };
+
 const setCookies = (res, accessToken, refreshToken) => {
+    const isProduction = process.env.NODE_ENV === "production";
+
+    const cookieOptions = {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? "none" : "lax",
+        path: "/",
+    };
+
     res.cookie("accessToken", accessToken, {
-        httpOnly: true, // prevent XSS attacks, cross site scripting attack
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
-        maxAge: 15 * 60 * 1000, // 15 minutes
+        ...cookieOptions,
+        maxAge: 15 * 60 * 1000,
     });
+
     res.cookie("refreshToken", refreshToken, {
-        httpOnly: true, // prevent XSS attacks, cross site scripting attack
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict", // prevents CSRF attack, cross-site request forgery attack
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        ...cookieOptions,
+        maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 };
+
 
 export const signup = async (req, res, next) => {
     const { email, password, name } = req.body;
@@ -102,8 +124,17 @@ export const logout = async (req, res) => {
             await redis.del(`refresh_token:${decoded.userId}`);
         }
 
-        res.clearCookie("accessToken");
-        res.clearCookie("refreshToken");
+        const isProduction = process.env.NODE_ENV === "production";
+        const clearOptions = {
+            httpOnly: true,
+            secure: isProduction,
+            sameSite: isProduction ? "none" : "lax",
+            path: "/",
+        };
+
+        res.clearCookie("accessToken", clearOptions);
+        res.clearCookie("refreshToken", clearOptions);
+
         res.json({ message: "Logged out successfully" });
     } catch (error) {
         console.log("Error in logout controller", error.message);
@@ -339,6 +370,58 @@ export const googleLogin = async (req, res) => {
     }
 };
 
+// export const googleLogin = async (req, res) => {
+//   const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+//   try {
+//     const { credential } = req.body;
+
+//     if (!credential) {
+//       return res.status(400).json({ message: "No Google credential received" });
+//     }
+
+//     const ticket = await client.verifyIdToken({
+//       idToken: credential,
+//       audience: process.env.GOOGLE_CLIENT_ID,
+//     });
+
+//     const payload = ticket.getPayload();
+//     const { sub, email, name, picture } = payload;
+
+//     let user = await User.findOne({ email });
+
+//     if (!user) {
+//       user = await User.create({
+//         name,
+//         email,
+//         avatar: picture,
+//         googleId: sub,
+//       });
+//     }
+
+//     const { accessToken, refreshToken } = generateTokens(user._id);
+//     await storeRefreshToken(user._id, refreshToken);
+//     setCookies(res, accessToken, refreshToken);
+
+//     return res.json({
+//       success: true,
+//       user: {
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         avatar: user.avatar,
+//         role: user.role,
+//       },
+//       accessToken,
+//       refreshToken,
+//     });
+//   } catch (err) {
+//     console.error("Google OAuth Error:", err.message);
+//     return res.status(401).json({ message: "Google authentication failed" });
+//   }
+// };
+
+
 
 export const requestOtp = async (req, res) => {
     try {
@@ -434,11 +517,11 @@ export const getAllUsers = async (req, res) => {
 export const customersOrdersAgg = async (req, res) => {
     try {
         const { userIds } = req.body
-        
+
         let match = {
             paymentStatus: "Paid", // IMPORTANT
         };
-        
+
         if (Array.isArray(userIds) && userIds.length > 0) {
             match.user = {
                 $in: userIds.map(id => new mongoose.Types.ObjectId(id)),

@@ -1104,7 +1104,7 @@ const HomePage = () => {
   const {
     list: products,
     loading,
-    loadProducts,
+    loadProducts, 
   } = useProductStore();
 
   // BUG FIX: Use `loadCart` not `fetchCart`
@@ -1120,13 +1120,14 @@ const HomePage = () => {
 
   // ── Load data on mount ──
   useEffect(() => {
-    // Load products (public — always works)
-    loadProducts({ page: 1, limit: 50 });
+  loadProducts({ page: 1, limit: 12 });
 
-    // Load cart + wishlist (authenticated — fails silently if not logged in)
+  setTimeout(() => {
     loadCart().catch(() => {});
     loadWishlist().catch(() => {});
-  }, []);
+  }, 0);
+}, [loadProducts, loadCart, loadWishlist]);
+
 
   // ── Derive sections ──
   const bestSellers = useMemo(
@@ -1227,9 +1228,9 @@ const HomePage = () => {
   );
 
   // ── Loading ──
-  if (loading && products.length === 0) {
-    return <Loading />;
-  }
+  // if (loading && products.length === 0) {
+  //   return <Loading />;
+  // }
 
   return (
     <main className="bg-white min-h-screen">
