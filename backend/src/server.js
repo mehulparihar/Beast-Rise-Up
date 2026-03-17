@@ -27,7 +27,6 @@
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    exposedHeaders: ["set-cookie"],
   }));
 
   app.use(express.json({ limit: "10mb" })); 
